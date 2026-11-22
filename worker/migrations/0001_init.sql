@@ -1,4 +1,4 @@
--- Open Verse Ai D1 schema. Plaintext API keys are NEVER stored.
+-- Open Verse Ai D1 schema, part 1. Plaintext API keys are NEVER stored.
 CREATE TABLE IF NOT EXISTS api_keys (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   key_hash     TEXT    NOT NULL UNIQUE,   -- hex SHA-256 of the full key

@@ -12,13 +12,13 @@
 <header class="nav"><div class="wrap"><a class="brand" href="index.html">Open Verse Ai</a><a href="index.html" aria-current="page">Home</a><a href="docs.html">Docs</a><a href="portal.html">API keys</a><a href="https://github.com/">GitHub</a></div></header>
 <main><div class="wrap">
   <h1>Answers you can check.</h1>
-  <p class="lead">Open Verse Ai is an open-source Q&amp;A API that answers mechatronics and stock-analysis questions from documents in this repo. Every answer cites its source, and when the docs don't cover a question it says so rather than guess.</p>
+  <p class="lead">Open Verse Ai is an open-source Q&amp;A API for mechatronics and stock-analysis questions. Answers from this repo's documents cite their source. Arithmetic is computed exactly. Anything else gets a clearly labelled, uncited answer from a Llama model.</p>
   <div class="row"><a href="portal.html"><button>Get an API key</button></a><a href="docs.html"><button class="secondary">Read the docs</button></a></div>
 
   <div class="grid" style="margin-top:32px">
-    <div class="card"><strong>Grounded</strong><p class="meta">Retrieval only. Answers are sentences from <code>knowledge/*.md</code>, never generated text.</p></div>
-    <div class="card"><strong>Cited</strong><p class="meta">Each answer links to the exact file and section it came from.</p></div>
-    <div class="card"><strong>Honest</strong><p class="meta">Off-topic or uncovered questions return <code>answered: false</code>.</p></div>
+    <div class="card"><strong>Docs first</strong><p class="meta"><code>mode: "docs"</code> answers are sentences from <code>knowledge/*.md</code>, linked to the exact section.</p></div>
+    <div class="card"><strong>Exact math</strong><p class="meta"><code>mode: "math"</code>: <code>1+1</code> is computed, not generated.</p></div>
+    <div class="card"><strong>Labelled AI</strong><p class="meta"><code>mode: "general"</code> answers come from Llama, are marked unverified, and can be turned off with <code>sources_only</code>.</p></div>
   </div>
 
   <h2>Quick start</h2>
@@ -28,5 +28,5 @@
   -d '{"question":"How do I tune a PID controller?"}'</code></pre>
   <p>Example topics: PID tuning, stepper microstepping, encoder resolution, ADC sampling, P/E ratio, RSI, Sharpe ratio, position sizing.</p>
 </div></main>
-<footer><div class="wrap">MIT licensed · Answers come only from the repo&#39;s <code>knowledge/</code> folder · Finance content is educational, not advice.</div></footer>
+<footer><div class="wrap">MIT licensed · Cited answers come from the repo&#39;s <code>knowledge/</code> folder; general answers are AI-generated · Finance content is educational, not advice.</div></footer>
 </body></html>

@@ -8,12 +8,23 @@ ALLOWED_ORIGINS = "https://commandcenter12.github.io,http://localhost:8080,http:
 REPO_URL = "https://github.com/CommandCenter12/open-verse-ai"
 RATE_PER_MINUTE = "20"
 QUOTA_PER_DAY = "500"
-KEYS_PER_IP_DAY = "3"
+KEYS_PER_IP_DAY = "20"
+# General (non-docs) answers via Workers AI. Set GENERAL_ENABLED = "false" to turn off.
+GENERAL_ENABLED = "true"
+AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+GENERAL_PER_DAY = "50"           # per key, per UTC day
+GENERAL_GLOBAL_PER_DAY = "2000"  # all keys combined: caps your Workers AI bill
+
+# Cloudflare Workers AI. In `wrangler dev` this binding always calls the real
+# service and uses your account's Workers AI allowance.
+[ai]
+binding = "AI"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "open-verse-ai"
 database_id = "2c68ba2c-166b-4a86-a6ed-7d40696df73c"
+migrations_dir = "migrations"
 
 # Hourly cleanup of expired rate-limit counters.
 [triggers]

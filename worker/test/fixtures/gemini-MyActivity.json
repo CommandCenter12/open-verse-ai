@@ -1,0 +1,10 @@
+[
+  { "header": "Gemini Apps", "title": "Prompted Explain RSI divergence for swing trading on daily charts", "time": "2026-05-02T18:20:00.000Z",
+    "products": ["Gemini Apps"], "safeHtmlItem": [{ "html": "<p>RSI divergence happens when price makes a new high&nbsp;but RSI doesn&#39;t.</p>" }] },
+  { "header": "Gemini Apps", "title": "Prompted What lookback period works best for that RSI setup?", "time": "2026-05-02T18:35:00.000Z",
+    "products": ["Gemini Apps"], "safeHtmlItem": [{ "html": "<p>14 is standard; shorter periods are noisier.</p>" }] },
+  { "header": "Gemini Apps", "title": "Prompted How do I size a stepper motor for a small CNC router?", "time": "2026-05-03T09:00:00.000Z",
+    "products": ["Gemini Apps"], "safeHtmlItem": [{ "html": "<ul><li>Estimate cutting force</li><li>Convert to torque</li></ul>" }] },
+  { "header": "Search", "title": "Searched for weather", "time": "2026-05-03T09:10:00.000Z", "products": ["Search"] },
+  { "header": "Gemini Apps", "title": "Used an Assistant feature", "time": "2026-05-03T09:20:00.000Z", "products": ["Gemini Apps"] }
+]

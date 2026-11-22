@@ -71,7 +71,8 @@
       $('sources').replaceChildren();
       if (r.answered) {
         $('answer').textContent = r.answer;
-        $('confidence').textContent = 'Confidence: ' + r.confidence;
+        const label = { docs: 'From the knowledge base', math: 'Calculated', general: 'General AI answer (' + r.model + '), not from the docs' }[r.mode] || r.mode;
+        $('confidence').textContent = label + ' · confidence: ' + r.confidence;
         for (const s of r.sources) {
           const li = document.createElement('li');
           const title = document.createElement(s.url ? 'a' : 'strong');
@@ -86,10 +87,11 @@
         setStatus(st, '');
       } else {
         $('answer').textContent = r.message;
-        $('confidence').textContent = r.nearest_topics.length ? 'Nearest topics: ' + r.nearest_topics.join('; ') : '';
+        const topics = (r.nearest_topics || []).length ? 'Nearest topics: ' + r.nearest_topics.join('; ') : '';
+        $('confidence').textContent = [topics, r.general_unavailable ? 'General answer unavailable: ' + r.general_unavailable : ''].filter(Boolean).join(' · ');
         setStatus(st, 'No grounded answer found.', 'warn');
       }
-      $('disclaimer').textContent = r.disclaimer || '';
+      $('disclaimer').textContent = [r.note, r.disclaimer].filter(Boolean).join(' ');
       $('result').hidden = false;
     } catch (err) { setStatus(st, err.message, 'err'); }
   }));
@@ -99,7 +101,8 @@
     const key = currentKey(st); if (!key) return;
     try {
       const m = await call('/v1/me', { key });
-      setStatus(st, `${m.prefix}… · ${m.usage.minute.used}/${m.usage.minute.limit} this minute · ${m.usage.day.used}/${m.usage.day.limit} today`, 'ok');
+      const g = m.usage.general_day ? ` · ${m.usage.general_day.used}/${m.usage.general_day.limit} AI answers today` : '';
+      setStatus(st, `${m.prefix}… · ${m.usage.minute.used}/${m.usage.minute.limit} this minute · ${m.usage.day.used}/${m.usage.day.limit} today${g}`, 'ok');
     } catch (err) { setStatus(st, err.message, 'err'); }
   }));
 

@@ -1,4 +1,4 @@
-// Retrieval-only Q&A: BM25 over the knowledge index, extractive answers with citations.
+// Knowledge-base Q&A: BM25 over the knowledge index, extractive answers with citations.
 // It never generates text that isn't in the knowledge base.
 import { tokenize } from './tokenize.js';
 import { HttpError } from './http.js';
@@ -23,7 +23,21 @@ export function validateQuestion(body) {
     }
     topK = body.top_k;
   }
-  return { question, topK };
+  let sourcesOnly = false;
+  if (body.sources_only !== undefined) {
+    if (typeof body.sources_only !== 'boolean') {
+      throw new HttpError(400, 'invalid_sources_only', '"sources_only" must be true or false.');
+    }
+    sourcesOnly = body.sources_only;
+  }
+  let useMemory = true;
+  if (body.use_memory !== undefined) {
+    if (typeof body.use_memory !== 'boolean') {
+      throw new HttpError(400, 'invalid_use_memory', '"use_memory" must be true or false.');
+    }
+    useMemory = body.use_memory;
+  }
+  return { question, topK, sourcesOnly, useMemory };
 }
 
 export function search(index, queryTerms, topK) {
@@ -76,11 +90,13 @@ export function answer(index, question, topK, repoUrl) {
   if (terms.length === 0) {
     throw new HttpError(400, 'no_searchable_terms', 'Question has no searchable words. Ask about a specific topic.');
   }
-  const hits = search(index, terms, topK);
+  // Bare numbers ("1 1") would match stray digits in the docs; never treat that as grounded.
+  const hits = terms.every((t) => /^\d+$/.test(t)) ? [] : search(index, terms, topK);
   const best = hits[0];
   if (!best || best.score < MIN_SCORE || best.coverage < MIN_COVERAGE) {
     return {
       answered: false,
+      mode: 'none',
       question,
       answer: null,
       message:
@@ -98,6 +114,7 @@ export function answer(index, question, topK, repoUrl) {
   const disclaimers = [...new Set(usable.map((h) => h.chunk.disclaimer).filter(Boolean))];
   return {
     answered: true,
+    mode: 'docs',
     question,
     answer: text,
     confidence,

@@ -7,11 +7,14 @@
     "build:index": "node ../scripts/build-index.mjs",
     "predev": "npm run build:index",
     "dev": "wrangler dev --local",
-    "db:local": "wrangler d1 execute open-verse-ai --local --file=schema.sql",
-    "db:remote": "wrangler d1 execute open-verse-ai --remote --file=schema.sql",
+    "db:local": "wrangler d1 migrations apply open-verse-ai --local",
+    "db:remote": "wrangler d1 migrations apply open-verse-ai --remote",
     "predeploy": "npm run build:index",
     "deploy": "wrangler deploy",
-    "test": "npm run build:index && node --test test/"
+    "test": "npm run build:index && node --test test/",
+    "memory:build": "node ../scripts/memory/build.mjs",
+    "memory:upload": "node ../scripts/memory/upload.mjs",
+    "memory:owner-key": "node ../scripts/memory/owner-key.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

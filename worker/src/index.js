@@ -1,8 +1,11 @@
 // Open Verse Ai API: Cloudflare Worker entry point.
 import { HttpError, json, errorResponse, readJson, corsHeaders, withHeaders } from './http.js';
 import { createKey, authenticate, touchKey, revokeKey, sha256Hex } from './keys.js';
-import { enforceAsk, usage, hit, intVar, windows, cleanup } from './ratelimit.js';
-import { validateQuestion, answer } from './qa.js';
+import { enforceAsk, usage, hit, intVar, windows, cleanup, reserveGeneral } from './ratelimit.js';
+import { validateQuestion } from './qa.js';
+import { resolveAsk } from './ask.js';
+import { aiConfigured, DEFAULT_MODEL } from './general.js';
+import { loadMemory } from './memory.js';
 import INDEX from './knowledge-index.json';
 
 async function route(request, env, ctx) {
@@ -12,7 +15,12 @@ async function route(request, env, ctx) {
 
   if (path === '/' || path === '/v1/health') {
     if (method !== 'GET') throw new HttpError(405, 'method_not_allowed', 'Use GET.');
-    return json({ ok: true, service: 'open-verse-ai', index: { chunks: INDEX.N, built_at: INDEX.builtAt } });
+    return json({
+      ok: true,
+      service: 'open-verse-ai',
+      index: { chunks: INDEX.N, built_at: INDEX.builtAt },
+      general: { enabled: aiConfigured(env), model: env.AI_MODEL || DEFAULT_MODEL },
+    });
   }
 
   if (path === '/v1/keys') {
@@ -52,6 +60,7 @@ async function route(request, env, ctx) {
     const row = await authenticate(request, env.DB);
     return json({
       prefix: row.prefix,
+      scope: row.scope,
       label: row.label,
       created_at: row.created_at,
       last_used_at: row.last_used_at,
@@ -63,10 +72,32 @@ async function route(request, env, ctx) {
     if (method !== 'POST') throw new HttpError(405, 'method_not_allowed', 'Use POST.');
     const row = await authenticate(request, env.DB);
     const body = await readJson(request); // validate before spending quota
-    const { question, topK } = validateQuestion(body);
+    const { question, topK, sourcesOnly, useMemory } = validateQuestion(body);
     const rl = await enforceAsk(env.DB, row.key_hash, env);
     ctx.waitUntil(touchKey(env.DB, row.id));
-    return json(answer(INDEX, question, topK, env.REPO_URL), 200, rl);
+    const result = await resolveAsk({
+      index: INDEX,
+      question,
+      topK,
+      sourcesOnly,
+      env,
+      reserveGeneral: () => reserveGeneral(env.DB, row.key_hash, env),
+      // Personal memory is only ever read for owner keys.
+      loadMemory: row.scope === 'owner' && useMemory ? () => loadMemory(env.DB, question) : null,
+    });
+    return json(result, 200, rl);
+  }
+
+  // Owner-only: see exactly which memory would be retrieved, without calling the model.
+  if (path === '/v1/memory/search') {
+    if (method !== 'POST') throw new HttpError(405, 'method_not_allowed', 'Use POST.');
+    const row = await authenticate(request, env.DB);
+    if (row.scope !== 'owner') throw new HttpError(403, 'owner_only', 'This endpoint requires an owner key.');
+    const body = await readJson(request);
+    const { question } = validateQuestion(body);
+    const rl = await enforceAsk(env.DB, row.key_hash, env);
+    const memory = await loadMemory(env.DB, question);
+    return json({ question, profile_present: Boolean(memory.profile), chunks: memory.chunks }, 200, rl);
   }
 
   throw new HttpError(404, 'not_found', `No route for ${method} ${path}.`);

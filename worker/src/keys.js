@@ -65,13 +65,14 @@ export async function authenticate(request, db) {
   }
   const hash = await sha256Hex(key);
   const row = await db
-    .prepare('SELECT id, key_hash, prefix, label, created_at, last_used_at FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL')
+    // SELECT * so this keeps working before migration 0002 adds `scope`.
+    .prepare('SELECT * FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL')
     .bind(hash)
     .first();
   if (!row) {
     throw new HttpError(401, 'invalid_api_key', 'API key is unknown or revoked.', { 'WWW-Authenticate': 'Bearer' });
   }
-  return row;
+  return { ...row, scope: row.scope === 'owner' ? 'owner' : 'public' };
 }
 
 export async function touchKey(db, id) {

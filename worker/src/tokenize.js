@@ -1,6 +1,6 @@
 // Shared by the index builder (Node) and the Worker so both tokenize identically.
 const STOP = new Set(
-  ('a an and are as at be but by can do does for from how i if in into is it its me my of on or our so ' +
+  ('a an and are as at be but by can did do does for from how i if in into is it its me my of on or our so ' +
     'than that the their then there these they this to was what when where which who why will with you your ' +
     'should would could about tell explain please give show define meaning mean')
     .split(' ')
@@ -25,4 +25,13 @@ export function tokenize(text) {
     .split(/[^a-z0-9]+/)
     .filter((t) => t && !STOP.has(t) && (t.length > 1 || /\d/.test(t)))
     .map(stem);
+}
+
+// Unstemmed content words, for engines that stem on their own (D1 FTS5 porter).
+export function contentWords(text) {
+  return [...new Set(
+    String(text).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t && !STOP.has(t) && (t.length > 2 || /\d/.test(t)))
+  )];
 }

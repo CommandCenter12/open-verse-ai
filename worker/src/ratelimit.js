@@ -76,9 +76,33 @@ export async function usage(db, keyHash, env) {
   return {
     minute: { used: Math.min(perMin, await peek(db, `ask:m:${keyHash}:${w.minute}`)), limit: perMin },
     day: { used: Math.min(perDay, await peek(db, `ask:d:${keyHash}:${w.day}`)), limit: perDay },
+    general_day: {
+      used: Math.min(intVar(env.GENERAL_PER_DAY, 50), await peek(db, `gen:d:${keyHash}:${w.day}`)),
+      limit: intVar(env.GENERAL_PER_DAY, 50),
+    },
   };
 }
 
 export async function cleanup(db) {
   await db.prepare('DELETE FROM counters WHERE expires_at < ?').bind(Math.floor(Date.now() / 1000)).run();
+}
+
+// General (LLM) answers cost Workers AI usage, so they get their own daily caps:
+// per key, and across all keys (keys are free to mint). Never throws; the ask still succeeds.
+export async function reserveGeneral(db, keyHash, env) {
+  const perKey = intVar(env.GENERAL_PER_DAY, 50);
+  const global = intVar(env.GENERAL_GLOBAL_PER_DAY, 2000);
+  const w = windows();
+  const kBucket = `gen:d:${keyHash}:${w.day}`;
+  const gBucket = `gen:all:${w.day}`;
+  if ((await hit(db, kBucket, 2 * 86400)) > perKey) {
+    await undo(db, kBucket);
+    return { ok: false, reason: 'general_quota_exceeded' };
+  }
+  if ((await hit(db, gBucket, 2 * 86400)) > global) {
+    await undo(db, gBucket);
+    await undo(db, kBucket);
+    return { ok: false, reason: 'service_general_quota_exceeded' };
+  }
+  return { ok: true };
 }

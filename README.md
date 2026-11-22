@@ -1,7 +1,16 @@
 # Open Verse Ai
 
 Open-source, **citation-first** Q&A API for mechatronics and stock-analysis methods.
-Answers are extracted only from Markdown in [`knowledge/`](knowledge/). When nothing there matches, the API says so (`"answered": false`) instead of guessing.
+Every answer says where it came from (`mode`):
+
+| `mode` | Source | Trust |
+|---|---|---|
+| `math` | Built-in arithmetic parser (`1+1` → `2`) | exact |
+| `docs` | Sentences from [`knowledge/`](knowledge/) with citations | cited |
+| `general` | Llama 3.3 70B on Cloudflare Workers AI, only when no doc matches | unverified, no sources |
+| `none` | Nothing applies → `"answered": false` + `general_unavailable` reason | n/a |
+
+Send `"sources_only": true` to get cited answers only. Questions about Open Verse Ai itself never go to the model.
 
 ```
 site/  (GitHub Pages, static)  ──HTTPS──▶  worker/  (Cloudflare Worker + D1)
@@ -17,7 +26,9 @@ knowledge/*.md ──scripts/build-index.mjs──▶ worker/src/knowledge-index
 | Path | What |
 |---|---|
 | `site/` | Static website deployed by `.github/workflows/pages.yml`. Public: no secrets. |
-| `worker/` | Cloudflare Worker API, D1 schema, tests. |
+| `worker/` | Cloudflare Worker API, D1 migrations, tests. |
+| `scripts/memory/` | Local pipeline for owner-only personal memory. |
+| `private/` | Gitignored: raw chat exports, chunks, profile. |
 | `knowledge/` | The only source of answers. One chunk per `##`/`###` section. |
 | `scripts/build-index.mjs` | Builds the search index from `knowledge/`. |
 
@@ -29,7 +40,7 @@ Requires Node 20+.
 cd worker
 npm install
 cp ../.env.example .dev.vars        # then set IP_SALT=$(openssl rand -hex 32)
-npm run db:local                     # create tables in local D1
+npm run db:local                     # apply migrations/ to local D1
 npm run dev                          # API on http://localhost:8787
 ```
 
@@ -54,7 +65,7 @@ cd worker && npm test
    cd worker
    npx wrangler login
    npx wrangler d1 create open-verse-ai     # paste database_id into wrangler.toml
-   npm run db:remote
+   npm run db:remote                        # applies worker/migrations/ in order
    npx wrangler secret put IP_SALT          # paste output of: openssl rand -hex 32
    npm run deploy
    ```
@@ -70,15 +81,43 @@ cd worker && npm test
 | `REPO_URL` | `wrangler.toml` | no | Builds source links in answers |
 | `RATE_PER_MINUTE` | `wrangler.toml` | no | Asks per key per minute (20) |
 | `QUOTA_PER_DAY` | `wrangler.toml` | no | Asks per key per UTC day (500) |
-| `KEYS_PER_IP_DAY` | `wrangler.toml` | no | New keys per network per day (3) |
+| `KEYS_PER_IP_DAY` | `wrangler.toml` | no | New keys per network per UTC day (20; code fallback 3) |
+| `GENERAL_ENABLED` | `wrangler.toml` | no | `"false"` turns off Llama answers |
+| `AI_MODEL` | `wrangler.toml` | no | Workers AI model id |
+| `GENERAL_PER_DAY` | `wrangler.toml` | no | Llama answers per key per UTC day (50) |
+| `GENERAL_GLOBAL_PER_DAY` | `wrangler.toml` | no | Llama answers across all keys per day (2000) |
+| `AI` binding | `wrangler.toml` `[ai]` | no | Workers AI; no API key needed |
+
+## Personal memory (owner only)
+
+Lets Open Verse Ai use your past Claude and Gemini chats plus a short profile as background, without sending whole logs.
+
+```
+private/exports/  ──build──▶  private/memory/chunks.jsonl  ──upload──▶  D1 memory_fts (FTS5) + memory_profile
+(raw, gitignored)   parse → redact → chunk    + private/profile.md (you write it)      ▲ read only for owner keys
+```
+
+1. Put exports in `private/exports/` (any layout):
+   - Claude: Settings → Privacy → Export data → `conversations.json`
+   - Gemini: Google Takeout → My Activity → **format: JSON** → `.../Gemini Apps/MyActivity.json`
+2. `cd worker && npm run memory:build`, then review `private/memory/chunks.jsonl` and `redaction-report.txt`. Add strings that must not be redacted to `private/redact-allow.txt`.
+3. Copy `private/profile.draft.md` to `private/profile.md` and rewrite it (≤ ~200 words, no TODOs).
+4. `npm run memory:upload -- --remote --yes` (replaces all memory; re-run after new exports).
+5. `npm run memory:owner-key -- --remote --label "me"` prints an owner key once.
+
+On owner requests that fall through to Llama, the profile and the top 3 matching chunks (≤ 700 chars each) are added to the prompt as labelled background, and returned in `memory_sources`. Docs and math answers never use memory. `"use_memory": false` turns it off per request. `POST /v1/memory/search` shows what would be retrieved.
+
+Limits: redaction is pattern-based, so review the chunks. Retrieval is keyword-based (FTS5 with stemming), so it can miss paraphrases. Retrieved chunks are sent to Workers AI.
 
 ## Security model
 
 - Keys: `ova_` + 32 random bytes (base64url), shown once. Only the SHA-256 hash goes in D1.
+- Scopes: `POST /v1/keys` only creates `public` keys. `owner` keys come from `scripts/memory/owner-key.mjs` and are the only keys that can read personal memory.
 - Auth: `Authorization: Bearer <key>` or `X-API-Key`. Malformed keys are rejected before any DB lookup.
 - Abuse: per-key minute rate and daily quota; per-IP (salted-hash) daily cap on key creation.
 - CORS is a browser convenience, not access control. The key is the access control.
-- Finance answers carry a disclaimer and only explain methods. The API never recommends trades.
+- Finance answers carry a disclaimer and only explain methods. The model's system prompt forbids trade recommendations.
+- Llama answers have their own per-key and global daily caps, so free keys can't run up your Workers AI bill.
 
 ## Adding knowledge
 

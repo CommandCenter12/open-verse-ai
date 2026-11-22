@@ -1,0 +1,14 @@
+[
+  {
+    "uuid": "c-1", "name": "Bassinet clamp torque", "created_at": "2026-03-14T10:00:00Z",
+    "chat_messages": [
+      { "sender": "human", "text": "I'm designing a bassinet mobile clamp, what torque should the thumb screw handle?", "created_at": "2026-03-14T10:00:00Z" },
+      { "sender": "assistant", "text": "", "content": [{ "type": "text", "text": "For a hand-tightened M6 thumb screw, about 1.5 to 2 N·m is typical. Add a rubber pad so the clamp doesn't mark the rail." }], "created_at": "2026-03-14T10:00:05Z" },
+      { "sender": "human", "text": "thanks!", "created_at": "2026-03-14T10:01:00Z" },
+      { "sender": "assistant", "text": "You're welcome.", "created_at": "2026-03-14T10:01:02Z" },
+      { "sender": "human", "text": "My email is jane.test@example.com and the key is sk-FAKEFAKEFAKEFAKE0000test", "created_at": "2026-03-14T10:02:00Z" },
+      { "sender": "assistant", "text": "Please don't share keys in chat.", "created_at": "2026-03-14T10:02:03Z" }
+    ]
+  },
+  { "uuid": "c-2", "name": "", "created_at": "2026-04-01T09:00:00Z", "chat_messages": [] }
+]
