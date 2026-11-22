@@ -18,6 +18,11 @@ export async function hit(db, bucket, ttlSeconds) {
   return row.count;
 }
 
+// Rolls back a hit that was rejected, so counters reflect accepted calls only.
+export async function undo(db, bucket) {
+  await db.prepare('UPDATE counters SET count = count - 1 WHERE bucket = ? AND count > 0').bind(bucket).run();
+}
+
 export async function peek(db, bucket) {
   const row = await db.prepare('SELECT count FROM counters WHERE bucket = ?').bind(bucket).first();
   return row ? row.count : 0;
@@ -33,21 +38,27 @@ export function windows(now = new Date()) {
 }
 
 // Enforces per-minute rate then per-day quota for one API key hash.
+// Increment-then-check keeps it atomic; rejected calls are rolled back.
 export async function enforceAsk(db, keyHash, env) {
   const perMin = intVar(env.RATE_PER_MINUTE, 20);
   const perDay = intVar(env.QUOTA_PER_DAY, 500);
   const w = windows();
 
-  const m = await hit(db, `ask:m:${keyHash}:${w.minute}`, 120);
+  const mBucket = `ask:m:${keyHash}:${w.minute}`;
+  const dBucket = `ask:d:${keyHash}:${w.day}`;
+  const m = await hit(db, mBucket, 120);
   if (m > perMin) {
+    await undo(db, mBucket);
     throw new HttpError(429, 'rate_limited', `Limit is ${perMin} requests per minute.`, {
       'Retry-After': String(w.secsToNextMinute),
       'X-RateLimit-Limit': String(perMin),
       'X-RateLimit-Remaining': '0',
     });
   }
-  const d = await hit(db, `ask:d:${keyHash}:${w.day}`, 2 * 86400);
+  const d = await hit(db, dBucket, 2 * 86400);
   if (d > perDay) {
+    await undo(db, dBucket);
+    await undo(db, mBucket);
     throw new HttpError(429, 'quota_exceeded', `Daily quota of ${perDay} requests used. Resets at 00:00 UTC.`, {
       'Retry-After': String(w.secsToNextDay),
       'X-RateLimit-Limit': String(perDay),
@@ -61,7 +72,7 @@ export async function usage(db, keyHash, env) {
   const w = windows();
   const perMin = intVar(env.RATE_PER_MINUTE, 20);
   const perDay = intVar(env.QUOTA_PER_DAY, 500);
-  // Counters also count rejected attempts, so clamp for display.
+  // Clamp only guards the brief overshoot of concurrent requests before rollback.
   return {
     minute: { used: Math.min(perMin, await peek(db, `ask:m:${keyHash}:${w.minute}`)), limit: perMin },
     day: { used: Math.min(perDay, await peek(db, `ask:d:${keyHash}:${w.day}`)), limit: perDay },

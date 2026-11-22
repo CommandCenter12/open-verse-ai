@@ -3,9 +3,9 @@ main = "src/index.js"
 compatibility_date = "2025-09-01"
 
 [vars]
-# Comma-separated list. Replace <your-user> with your GitHub username.
-ALLOWED_ORIGINS = "https://<your-user>.github.io,http://localhost:8080,http://127.0.0.1:8080"
-REPO_URL = "https://github.com/<your-user>/open-verse-ai"
+# Comma-separated origins (scheme + host only, no path). Browsers send the host lowercased.
+ALLOWED_ORIGINS = "https://commandcenter12.github.io,http://localhost:8080,http://127.0.0.1:8080"
+REPO_URL = "https://github.com/CommandCenter12/open-verse-ai"
 RATE_PER_MINUTE = "20"
 QUOTA_PER_DAY = "500"
 KEYS_PER_IP_DAY = "3"
@@ -13,8 +13,7 @@ KEYS_PER_IP_DAY = "3"
 [[d1_databases]]
 binding = "DB"
 database_name = "open-verse-ai"
-# Fill in after `npx wrangler d1 create open-verse-ai` (the local dev placeholder works as-is).
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "2c68ba2c-166b-4a86-a6ed-7d40696df73c"
 
 # Hourly cleanup of expired rate-limit counters.
 [triggers]
