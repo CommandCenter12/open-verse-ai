@@ -90,6 +90,8 @@ cd worker && npm test
 | `PASSKEY_ORIGINS` | `wrangler.toml` | no | Pages allowed to use passkeys (hostname = RP ID) |
 | `PASSKEY_ATTEMPTS_PER_HOUR` | `wrangler.toml` | no | Passkey attempts per network per hour (30) |
 | `SESSION_HOURS` | `wrangler.toml` | no | Passkey session lifetime (12) |
+| `MEMORY_LEARN` | `wrangler.toml` | no | `"false"` stops owner memory from learning |
+| `TOOLS_ENABLED` | `wrangler.toml` | no | `"false"` turns off live weather/stock tools (default on) |
 
 ## Personal memory (owner only)
 
@@ -116,6 +118,22 @@ private/exports/  ──build──▶  private/memory/chunks.jsonl  ──uploa
 On owner requests that fall through to Llama, the profile and the top 3 matching chunks (≤ 700 chars each) are added to the prompt as labelled background, and returned in `memory_sources`. Docs and math answers never use memory. `"use_memory": false` turns it off per request. `POST /v1/memory/search` shows what would be retrieved.
 
 Limits: redaction is pattern-based (emails, phones, card numbers, keys/tokens, passwords), so review the chunks; names and street addresses inside text are not removed. Retrieval is keyword-based (FTS5 with stemming), so it can miss paraphrases. Retrieved chunks are sent to Workers AI.
+
+## Live data tools
+
+Weather and market-price questions skip the docs. Llama picks a tool (`get_weather`, `get_stock_quote`) and its arguments (it fixes typos like "nvidea" → NVDA); the Worker fetches the data (Open-Meteo, Yahoo Finance chart API: free, no keys, Yahoo is unofficial and may be delayed or blocked) and Llama words the answer from it. If the model doesn't call a tool on an obvious live question, the Worker fetches anyway. Answers come back as `mode: "live"` with the raw data in `live_data`. Turn off with `TOOLS_ENABLED = "false"`.
+
+## Memory that learns (owner only)
+
+| You say | It does |
+|---|---|
+| "remember that I'm in AP Physics 1" | saves a fact |
+| "from now on keep answers short" | saves a preference |
+| "no, my test is on rotational motion" | saves a correction, linked to the last question |
+| "what do you remember about me?" | lists facts |
+| "forget that I take Algebra 2" / "forget everything you learned" | removes matching facts / all facts + learned conversations |
+
+Facts go into every owner prompt (≈1,800 chars, newest first). Answered owner questions are saved (redacted) as searchable conversations (`source = 'openverse'`, newest 5,000 kept). Not saved: live data, math, questions about past conversations, "I don't know" answers (they would make memory quote itself). `memory:upload` replaces imported data but keeps facts and learned conversations. Off switch: `MEMORY_LEARN = "false"` or `"use_memory": false` per request.
 
 ## Touch ID sign-in (passkeys)
 

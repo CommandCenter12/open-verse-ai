@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Replaces the memory tables in D1 with private/memory/chunks.jsonl + private/profile.md.
+// Replaces imported memory in D1 with private/memory/chunks.jsonl + private/profile.md.
+// Learned conversations (source 'openverse') and saved facts are kept.
 //   node scripts/memory/upload.mjs --local
 //   node scripts/memory/upload.mjs --remote --yes
 // Options: --chunks <path> --profile <path>
@@ -31,7 +32,8 @@ if (profile.length > MAX_PROFILE_CHARS) {
 }
 
 const q = (s) => `'${String(s ?? '').replace(/\u0000/g, '').replace(/'/g, "''")}'`;
-const statements = ['DELETE FROM memory_fts;'];
+// Replace imported data only; keep what Open Verse Ai learned in conversations.
+const statements = ["DELETE FROM memory_fts WHERE source <> 'openverse';"];
 const MAX_STATEMENT = 80_000; // D1 limit is 100 KB per statement
 let batch = [];
 let size = 0;

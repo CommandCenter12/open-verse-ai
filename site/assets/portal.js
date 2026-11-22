@@ -176,8 +176,14 @@
       $('sources').replaceChildren();
       if (r.answered) {
         $('answer').textContent = r.answer;
-        const label = { docs: 'From the knowledge base', math: 'Calculated', general: 'General AI answer (' + r.model + '), not from the docs' }[r.mode] || r.mode;
-        $('confidence').textContent = label + ' · confidence: ' + r.confidence;
+        const label = {
+          docs: 'From the knowledge base',
+          math: 'Calculated',
+          live: 'Live data (' + (r.live_data || []).map((d) => d.source).filter(Boolean).join(', ') + ')',
+          memory: 'Memory',
+          general: 'General AI answer (' + r.model + '), not from the docs',
+        }[r.mode] || r.mode;
+        $('confidence').textContent = label + ' · confidence: ' + r.confidence + (r.learned ? ' · saved to memory' : '');
         for (const s of r.sources) {
           const li = document.createElement('li');
           const title = document.createElement(s.url ? 'a' : 'strong');

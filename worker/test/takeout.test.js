@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parseMbox, parseMessage, ownText, parseKeepNote, parseIcs, parseDriveFile, docxText } from '../../scripts/memory/parse-takeout.mjs';
 import { chunkDocs, DOC_CHUNK_CHARS } from '../../scripts/memory/chunk.mjs';
-import { redact } from '../../scripts/memory/redact.mjs';
+import { redact } from '../src/redact.js';
 import { makeDocx } from './fixtures/make-docx.mjs';
 
 const T = new URL('./fixtures/takeout/Takeout/', import.meta.url).pathname;

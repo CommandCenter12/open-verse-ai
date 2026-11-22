@@ -15,7 +15,7 @@ import { args, PRIVATE, writeJsonl } from './lib.mjs';
 import { parseClaude } from './parse-claude.mjs';
 import { parseGemini } from './parse-gemini.mjs';
 import { parseDriveFile, parseMbox, parseKeepNote, parseIcs } from './parse-takeout.mjs';
-import { redact } from './redact.mjs';
+import { redact } from '../../worker/src/redact.js';
 import { chunkTurns, chunkDocs } from './chunk.mjs';
 import { draftProfile } from './profile.mjs';
 

@@ -6,6 +6,7 @@ import { validateQuestion } from './qa.js';
 import { resolveAsk } from './ask.js';
 import { aiConfigured, DEFAULT_MODEL } from './general.js';
 import { loadMemory } from './memory.js';
+import { parseCommand, handleCommand, shouldLearn, saveConversation, pruneLearned, LEARNED_SOURCE } from './learn.js';
 import {
   passkeyContext, limitPasskeyAttempts, registrationOptions, registerPasskey,
   authenticationOptions, signIn, listPasskeys, deletePasskey, cleanupPasskeys,
@@ -91,6 +92,11 @@ async function route(request, env, ctx) {
     const { question, topK, sourcesOnly, useMemory } = validateQuestion(body);
     const rl = await enforceAsk(env.DB, row.key_hash, env);
     ctx.waitUntil(touchKey(env.DB, row.id));
+    const learning = row.scope === 'owner' && useMemory && env.MEMORY_LEARN !== 'false';
+    if (learning) {
+      const cmd = parseCommand(question);
+      if (cmd) return json(await handleCommand(env.DB, cmd, question), 200, rl);
+    }
     const result = await resolveAsk({
       index: INDEX,
       question,
@@ -100,8 +106,31 @@ async function route(request, env, ctx) {
       reserveGeneral: () => reserveGeneral(env.DB, row.key_hash, env),
       // Personal memory is only ever read for owner keys.
       loadMemory: row.scope === 'owner' && useMemory ? () => loadMemory(env.DB, question) : null,
+      // Approximate location of the caller (from Cloudflare), only for "weather" with no city.
+      where: request.cf && request.cf.latitude ? { latitude: request.cf.latitude, longitude: request.cf.longitude, city: request.cf.city, country: request.cf.country } : null,
     });
+    if (learning && shouldLearn(result)) {
+      ctx.waitUntil(saveConversation(env.DB, question, result).catch((e) => console.error('learn failed', e.message)));
+      result.learned = true;
+    }
     return json(result, 200, rl);
+  }
+
+  // Owner-only: saved facts.
+  if (path === '/v1/memory/facts' || path.startsWith('/v1/memory/facts/')) {
+    const row = await authenticate(request, env.DB);
+    if (row.scope !== 'owner') throw new HttpError(403, 'owner_only', 'This endpoint requires an owner key.');
+    if (path === '/v1/memory/facts') {
+      if (method !== 'GET') throw new HttpError(405, 'method_not_allowed', 'Use GET.');
+      const { results } = await env.DB.prepare('SELECT id, kind, text, context, created_at FROM memory_facts ORDER BY id DESC').all();
+      const learned = await env.DB.prepare('SELECT count(*) AS n FROM memory_fts WHERE source = ?').bind(LEARNED_SOURCE).first();
+      return json({ facts: results || [], learned_conversations: learned ? learned.n : 0 });
+    }
+    if (method !== 'DELETE') throw new HttpError(405, 'method_not_allowed', 'Use DELETE.');
+    const id = Number(path.slice('/v1/memory/facts/'.length));
+    const r = await env.DB.prepare('DELETE FROM memory_facts WHERE id = ? RETURNING id').bind(id).first();
+    if (!r) throw new HttpError(404, 'not_found', 'No such fact.');
+    return json({ deleted: true, id });
   }
 
   // Owner-only: see exactly which memory would be retrieved, without calling the model.
@@ -113,7 +142,7 @@ async function route(request, env, ctx) {
     const { question } = validateQuestion(body);
     const rl = await enforceAsk(env.DB, row.key_hash, env);
     const memory = await loadMemory(env.DB, question);
-    return json({ question, profile_present: Boolean(memory.profile), chunks: memory.chunks }, 200, rl);
+    return json({ question, profile_present: Boolean(memory.profile), facts: memory.facts, chunks: memory.chunks }, 200, rl);
   }
 
   // ---------- Passkeys (Touch ID) ----------
@@ -170,6 +199,6 @@ export default {
   },
 
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(Promise.all([cleanup(env.DB), cleanupPasskeys(env.DB).catch(() => {})]));
+    ctx.waitUntil(Promise.all([cleanup(env.DB), cleanupPasskeys(env.DB).catch(() => {}), pruneLearned(env.DB).catch(() => {})]));
   },
 };

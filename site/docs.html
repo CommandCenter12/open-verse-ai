@@ -24,6 +24,7 @@
     <tr><td><code>POST /v1/keys</code></td><td>No</td><td>Create a key. Body: <code>{"label":"optional"}</code>. Key returned once. 20 per network per UTC day.</td></tr>
     <tr><td><code>GET /v1/me</code></td><td>Yes</td><td>Key prefix, label and current usage.</td></tr>
     <tr><td><code>POST /v1/ask</code></td><td>Yes</td><td>Ask a question. Body: <code>{"question":"…","top_k":3,"sources_only":false}</code>.</td></tr>
+    <tr><td><code>GET /v1/memory/facts</code> · <code>DELETE /v1/memory/facts/{id}</code></td><td>Owner</td><td>List or delete saved facts; shows how many conversations were learned.</td></tr>
     <tr><td><code>POST /v1/memory/search</code></td><td>Owner</td><td>Show which personal-memory chunks a question would retrieve. Public keys get <code>403 owner_only</code>.</td></tr>
     <tr><td><code>DELETE /v1/keys/current</code></td><td>Yes</td><td>Revoke the key used for this request. Not allowed with a passkey session.</td></tr>
     <tr><td><code>POST /v1/passkeys/register/options</code> · <code>/verify</code></td><td>Owner key</td><td>Register a passkey (Touch ID, Face ID, Windows Hello, security key) for the owner key. Must be called from the portal origin.</td></tr>
@@ -48,6 +49,8 @@
     <tr><th><code>mode</code></th><th>When</th><th>Trust</th></tr>
     <tr><td><code>math</code></td><td>The question is plain arithmetic, e.g. <code>1+1</code></td><td><code>confidence: "exact"</code>, no model involved</td></tr>
     <tr><td><code>docs</code></td><td>The knowledge base covers it</td><td>Cited <code>sources</code> with links</td></tr>
+    <tr><td><code>live</code></td><td>Weather or market-price questions</td><td><code>confidence: "live-data"</code>; fetched just now from Open-Meteo or Yahoo Finance (unofficial, may be delayed), listed in <code>live_data</code></td></tr>
+    <tr><td><code>memory</code></td><td>Owner keys: "remember that …", "from now on …", "no, actually …", "forget …", "what do you remember about me?"</td><td>Saved/removed facts; no model involved</td></tr>
     <tr><td><code>general</code></td><td>No doc matched, <code>sources_only</code> is false, and the question isn't about Open Verse Ai</td><td><code>confidence: "unverified"</code>, no sources, includes <code>model</code> and <code>note</code></td></tr>
     <tr><td><code>none</code></td><td>Nothing applies</td><td><code>answered: false</code>, plus <code>general_unavailable</code> with the reason</td></tr>
   </table></div>

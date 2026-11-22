@@ -19,11 +19,14 @@ GENERAL_GLOBAL_PER_DAY = "2000"  # all keys combined: caps your Workers AI bill
 PASSKEY_ORIGINS = "https://commandcenter12.github.io,http://localhost:8080"
 PASSKEY_ATTEMPTS_PER_HOUR = "30"  # per network
 SESSION_HOURS = "12"
+# Owner memory learns from conversations and "remember that …". "false" turns it off.
+MEMORY_LEARN = "true"
 
 # Cloudflare Workers AI. In `wrangler dev` this binding always calls the real
 # service and uses your account's Workers AI allowance.
 [ai]
 binding = "AI"
+remote = true  # local dev calls the real Workers AI (there is no local model)
 
 [[d1_databases]]
 binding = "DB"

@@ -7,6 +7,12 @@ domain: project
 ## Overview
 Open Verse Ai is a question answering API. It answers questions in three ways, reported in the mode field of each response. Mode math computes plain arithmetic such as 1+1 exactly, without any AI model. Mode docs searches the Markdown documents in the knowledge folder of the repository and returns the most relevant sentences with citations. Mode general is used only when no document covers the question: a Llama model on Cloudflare Workers AI writes a short answer that has no citations and is marked unverified. If none of these apply, the response has answered set to false and mode none.
 
+## Live data
+Questions about current weather or stock and market prices get mode live. The Worker fetches the data just now, weather from Open-Meteo and quotes from Yahoo Finance, which is unofficial and may be delayed, and the model words the answer from that data. The fetched data is listed in live_data. When the user asks about the weather without a city, the approximate location of the request is used.
+
+## Learning memory
+For owner keys, Open Verse Ai learns. Saying "remember that ..." or "from now on ..." saves a fact or preference, and "no, actually ..." saves a correction; these are given to the model on every owner question. "Forget ..." removes matching facts, "forget everything you learned" removes all facts and learned conversations, and "what do you remember about me?" lists the facts. Answered owner questions are also saved as past conversations that later questions can find. Live data, math, questions about past conversations and answers that say they don't know are not saved. Set use_memory to false to neither use nor save memory for one question.
+
 ## General answers
 General answers come from a Llama language model, not from the knowledge base, so they can be wrong and carry no sources. They are never used for questions about Open Verse Ai itself, its API, endpoints, keys or limits; those are answered from these docs or not at all. Each key can get 50 general answers per UTC day by default. Send sources_only set to true in the request body to disable general answers and get only cited answers from the knowledge base. When a general answer is not available, the response includes general_unavailable with the reason, such as sources_only, project_question, general_quota_exceeded, disabled or error.
 

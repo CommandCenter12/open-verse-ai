@@ -10,6 +10,7 @@ import { HttpError } from './http.js';
 import { answer as docsAnswer } from './qa.js';
 import { tryMath } from './math.js';
 import { aiConfigured, generalAnswer, isProjectQuestion } from './general.js';
+import { liveIntent } from './tools.js';
 
 const NO_DOCS_MESSAGE =
   "I couldn't find this in the Open Verse Ai knowledge base, so I won't guess. " +
@@ -21,7 +22,7 @@ function notAnswered(question, extra = {}) {
 
 // reserveGeneral(): Promise<{ ok: true } | { ok: false, reason: string }> – consumes general quota.
 // loadMemory(): Promise<{ profile, chunks }> – owner keys only; null for everyone else.
-export async function resolveAsk({ index, question, topK, sourcesOnly, env, reserveGeneral, loadMemory = null, log = console }) {
+export async function resolveAsk({ index, question, topK, sourcesOnly, env, reserveGeneral, loadMemory = null, where = null, log = console }) {
   const math = tryMath(question);
   if (math) {
     if (math.error) {
@@ -40,7 +41,9 @@ export async function resolveAsk({ index, question, topK, sourcesOnly, env, rese
   }
 
   const hasTerms = tokenize(question).length > 0;
-  const docs = hasTerms ? docsAnswer(index, question, topK, env.REPO_URL) : notAnswered(question);
+  // Weather and market-price questions need live data, not the docs.
+  const live = !sourcesOnly && aiConfigured(env) && env.TOOLS_ENABLED !== 'false' && liveIntent(question);
+  const docs = hasTerms && !live ? docsAnswer(index, question, topK, env.REPO_URL) : notAnswered(question);
   if (docs.answered) return docs;
 
   const generalAllowed = !sourcesOnly && aiConfigured(env) && !isProjectQuestion(question);
@@ -57,7 +60,7 @@ export async function resolveAsk({ index, question, topK, sourcesOnly, env, rese
 
   const memory = loadMemory ? await loadMemory() : null;
   try {
-    return { ...(await generalAnswer(env, question, memory)), nearest_topics: docs.nearest_topics };
+    return { ...(await generalAnswer(env, question, memory, { where })), nearest_topics: docs.nearest_topics };
   } catch (err) {
     log.error('general answer failed', err && err.message);
     return { ...docs, general_unavailable: 'error' };

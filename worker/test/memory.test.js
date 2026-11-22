@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseClaude } from '../../scripts/memory/parse-claude.mjs';
 import { parseGemini } from '../../scripts/memory/parse-gemini.mjs';
-import { redact } from '../../scripts/memory/redact.mjs';
+import { redact } from '../src/redact.js';
 import { chunkTurns } from '../../scripts/memory/chunk.mjs';
 import { draftProfile } from '../../scripts/memory/profile.mjs';
 import { matchQuery, coverage } from '../src/memory.js';
@@ -71,6 +71,7 @@ test('matchQuery quotes words so FTS syntax in questions is inert', () => {
   const m = matchQuery('What did I decide about the clamp NEAR "torque" OR -rail*?');
   assert.equal(m.query, '"decide" OR "clamp" OR "near" OR "torque" OR "rail"');
   assert.equal(matchQuery('what is it?'), null);
+  assert.equal(matchQuery('What did I ask you about physics earlier?').query, '"physics"');
   assert.equal(coverage(['clamps', 'torque'], 'clamp torque spec'), 2);
 });
 
