@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Verse Ai Docs</title>
+<meta name="description" content="API reference for Open Verse Ai: authentication, endpoints, limits and errors.">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/config.js"></script>
+</head>
+<body>
+<header class="nav"><div class="wrap"><a class="brand" href="index.html">Open Verse Ai</a><a href="index.html">Home</a><a href="docs.html" aria-current="page">Docs</a><a href="portal.html">API keys</a><a href="https://github.com/">GitHub</a></div></header>
+<main><div class="wrap">
+  <h1>API reference</h1>
+  <p class="lead">Base URL: <code id="base"></code>. All requests and responses use JSON.</p>
+
+  <h2>Authentication</h2>
+  <p>Send your key as <code>Authorization: Bearer ova_…</code> (preferred) or <code>X-API-Key: ova_…</code>. The server stores only a SHA-256 hash, so a lost key can't be recovered. Create a new one instead.</p>
+
+  <h2>Endpoints</h2>
+  <div class="table-scroll"><table>
+    <tr><th>Method &amp; path</th><th>Auth</th><th>Purpose</th></tr>
+    <tr><td><code>GET /v1/health</code></td><td>No</td><td>Service status and index size.</td></tr>
+    <tr><td><code>POST /v1/keys</code></td><td>No</td><td>Create a key. Body: <code>{"label":"optional"}</code>. Key returned once. 3 per network per day.</td></tr>
+    <tr><td><code>GET /v1/me</code></td><td>Yes</td><td>Key prefix, label and current usage.</td></tr>
+    <tr><td><code>POST /v1/ask</code></td><td>Yes</td><td>Ask a question. Body: <code>{"question":"…","top_k":3}</code>.</td></tr>
+    <tr><td><code>DELETE /v1/keys/current</code></td><td>Yes</td><td>Revoke the key used for this request.</td></tr>
+  </table></div>
+
+  <h2>Ask: response</h2>
+<pre><code>{
+  "answered": true,
+  "question": "How is RSI calculated?",
+  "answer": "RSI measures momentum on a 0 to 100 scale: RSI = 100 − 100 / (1 + RS) …",
+  "confidence": "high",
+  "sources": [{ "ref": 1, "title": "Stock Analysis Methods", "section": "Relative strength index (RSI)",
+                "file": "knowledge/stock-analysis-methods.md", "url": "…", "score": 9.4, "excerpt": "…" }],
+  "disclaimer": "Educational information only, not financial advice. …"
+}</code></pre>
+  <p>When nothing in the knowledge base matches well enough, you get <code>"answered": false</code>, <code>"answer": null</code>, empty <code>sources</code>, and <code>nearest_topics</code> to help you rephrase.</p>
+
+  <h2>Limits</h2>
+  <p>20 asks per minute and 500 per UTC day per key (defaults). Responses carry <code>X-RateLimit-Limit</code> and <code>X-RateLimit-Remaining</code>. A 429 includes <code>Retry-After</code> in seconds.</p>
+
+  <h2>Errors</h2>
+<pre><code>{ "error": { "code": "rate_limited", "message": "Limit is 20 requests per minute." } }</code></pre>
+  <div class="table-scroll"><table>
+    <tr><th>Status</th><th>Codes</th></tr>
+    <tr><td>400</td><td><code>empty_question</code>, <code>question_too_short</code>, <code>question_too_long</code>, <code>no_searchable_terms</code>, <code>invalid_top_k</code>, <code>invalid_json</code>, <code>invalid_label</code></td></tr>
+    <tr><td>401</td><td><code>missing_api_key</code>, <code>invalid_api_key</code>, <code>invalid_auth_header</code></td></tr>
+    <tr><td>404 / 405</td><td><code>not_found</code>, <code>method_not_allowed</code></td></tr>
+    <tr><td>413 / 415</td><td><code>payload_too_large</code>, <code>unsupported_media_type</code></td></tr>
+    <tr><td>429</td><td><code>rate_limited</code>, <code>quota_exceeded</code>, <code>key_limit</code></td></tr>
+  </table></div>
+
+  <h2>Adding knowledge</h2>
+  <p>Add a Markdown file to <code>knowledge/</code>. Each <code>##</code>/<code>###</code> section becomes one searchable chunk. Optional front matter: <code>title</code>, <code>domain</code>, <code>disclaimer</code>. Then run <code>npm run deploy</code> in <code>worker/</code> (it rebuilds the index first).</p>
+</div></main>
+<script>document.getElementById('base').textContent = window.OVA_CONFIG.API_BASE;</script>
+<footer><div class="wrap">MIT licensed · Answers come only from the repo&#39;s <code>knowledge/</code> folder · Finance content is educational, not advice.</div></footer>
+</body></html>

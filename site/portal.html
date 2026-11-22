@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API Key Portal</title>
+<meta name="description" content="Create, check and revoke Open Verse Ai API keys, and try the Q&A API.">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/config.js"></script>
+</head>
+<body>
+<header class="nav"><div class="wrap"><a class="brand" href="index.html">Open Verse Ai</a><a href="index.html">Home</a><a href="docs.html">Docs</a><a href="portal.html" aria-current="page">API keys</a><a href="https://github.com/">GitHub</a></div></header>
+<main><div class="wrap">
+  <h1>API keys</h1>
+  <p class="lead">Create a key, then try it below. Keys are never saved in this browser; the page keeps them only until you reload.</p>
+
+  <section class="card" aria-labelledby="create-h">
+    <h2 id="create-h" style="margin-top:0">1. Create a key</h2>
+    <label for="label">Label (optional)</label>
+    <input id="label" maxlength="60" placeholder="e.g. laptop scripts">
+    <button id="create">Create key</button>
+    <div id="created" hidden>
+      <p><strong>Your new key</strong> (shown once; copy it now):</p>
+      <div class="keybox" id="newkey"></div>
+      <div class="row"><button class="secondary" id="copy">Copy</button><button class="secondary" id="usekey">Use it below</button></div>
+    </div>
+    <div class="status" id="create-status" role="status"></div>
+  </section>
+
+  <section class="card" aria-labelledby="ask-h">
+    <h2 id="ask-h" style="margin-top:0">2. Ask a question</h2>
+    <label for="key">API key</label>
+    <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="ova_…">
+    <label for="question">Question</label>
+    <textarea id="question" maxlength="500" placeholder="How many microsteps per revolution with 16x microstepping?"></textarea>
+    <div class="row">
+      <button id="ask">Ask</button>
+      <button class="secondary" id="me">Check usage</button>
+      <button class="danger" id="revoke">Revoke this key</button>
+    </div>
+    <div class="status" id="ask-status" role="status"></div>
+    <div id="result" hidden>
+      <p class="meta" id="confidence"></p>
+      <p class="answer" id="answer"></p>
+      <p class="meta" id="disclaimer"></p>
+      <ol class="sources" id="sources"></ol>
+    </div>
+  </section>
+</div></main>
+<script src="assets/portal.js"></script>
+<footer><div class="wrap">MIT licensed · Answers come only from the repo&#39;s <code>knowledge/</code> folder · Finance content is educational, not advice.</div></footer>
+</body></html>

@@ -1,0 +1,19 @@
+{
+  "name": "open-verse-ai-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:index": "node ../scripts/build-index.mjs",
+    "predev": "npm run build:index",
+    "dev": "wrangler dev --local",
+    "db:local": "wrangler d1 execute open-verse-ai --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute open-verse-ai --remote --file=schema.sql",
+    "predeploy": "npm run build:index",
+    "deploy": "wrangler deploy",
+    "test": "npm run build:index && node --test test/"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
