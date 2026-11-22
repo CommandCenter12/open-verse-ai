@@ -3,10 +3,25 @@
 import { tokenize } from './tokenize.js';
 import { HttpError } from './http.js';
 
+// Words that name the project: present in many API chunks, so they make any question
+// "about Open Verse Ai" look covered. Ignored by the weighted-coverage check.
+const PROJECT_TERMS = new Set(tokenize('open verse ai api v1'));
+// Generic question words. If the docs never use one, that alone shouldn't block an answer
+// ("How is RSI calculated?" is answered by the RSI section).
+const WEAK_TERMS = new Set(tokenize(
+  'calculate calculated calculation compute computed work works working use used using happen happens mean means ' +
+  'find get make need explain example formula difference between best good quickly quick easy simple step steps way ways ' +
+  'value values number numbers typical usually exactly correct right determine figure choose pick many much'
+));
+
 const K1 = 1.2;
 const B = 0.75;
 export const MIN_SCORE = 2.0;    // below this the best match is too weak to answer
 export const MIN_COVERAGE = 0.5; // share of distinct query terms the best chunk must contain
+// Same, but each term weighted by rarity (IDF; words absent from the docs count as rarest).
+// Stops "Does X have a /v1/translate endpoint?" matching on the common words while the
+// one word that matters ("translate") appears nowhere.
+export const MIN_WEIGHTED_COVERAGE = 0.5;
 
 export function validateQuestion(body) {
   const q = body.question;
@@ -41,20 +56,30 @@ export function validateQuestion(body) {
 }
 
 export function search(index, queryTerms, topK) {
-  const terms = [...new Set(queryTerms)];
+  // Generic words ("work", "get") only count when the question has nothing else.
+  const unique = [...new Set(queryTerms)];
+  const strong = unique.filter((t) => !WEAK_TERMS.has(t));
+  const terms = strong.length ? strong : unique;
+  const idfOf = (t) => {
+    const df = index.df[t] || 0;
+    return Math.log(1 + (index.N - df + 0.5) / (df + 0.5));
+  };
+  const counted = terms.filter((t) => !PROJECT_TERMS.has(t));
+  const totalIdf = counted.reduce((s, t) => s + idfOf(t), 0);
   const scored = [];
   for (const chunk of index.chunks) {
     let score = 0;
     let matched = 0;
+    let matchedIdf = 0;
     for (const t of terms) {
       const tf = chunk.tf[t];
       if (!tf) continue;
       matched++;
-      const df = index.df[t] || 0;
-      const idf = Math.log(1 + (index.N - df + 0.5) / (df + 0.5));
+      const idf = idfOf(t);
+      if (counted.includes(t)) matchedIdf += idf;
       score += idf * ((tf * (K1 + 1)) / (tf + K1 * (1 - B + (B * chunk.len) / index.avgdl)));
     }
-    if (score > 0) scored.push({ chunk, score, coverage: matched / terms.length });
+    if (score > 0) scored.push({ chunk, score, coverage: matched / terms.length, weighted: totalIdf ? matchedIdf / totalIdf : 1 });
   }
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, topK);
@@ -93,7 +118,7 @@ export function answer(index, question, topK, repoUrl) {
   // Bare numbers ("1 1") would match stray digits in the docs; never treat that as grounded.
   const hits = terms.every((t) => /^\d+$/.test(t)) ? [] : search(index, terms, topK);
   const best = hits[0];
-  if (!best || best.score < MIN_SCORE || best.coverage < MIN_COVERAGE) {
+  if (!best || best.score < MIN_SCORE || best.coverage < MIN_COVERAGE || best.weighted < MIN_WEIGHTED_COVERAGE) {
     return {
       answered: false,
       mode: 'none',

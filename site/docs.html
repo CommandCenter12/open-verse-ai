@@ -25,7 +25,12 @@
     <tr><td><code>GET /v1/me</code></td><td>Yes</td><td>Key prefix, label and current usage.</td></tr>
     <tr><td><code>POST /v1/ask</code></td><td>Yes</td><td>Ask a question. Body: <code>{"question":"…","top_k":3,"sources_only":false}</code>.</td></tr>
     <tr><td><code>POST /v1/memory/search</code></td><td>Owner</td><td>Show which personal-memory chunks a question would retrieve. Public keys get <code>403 owner_only</code>.</td></tr>
-    <tr><td><code>DELETE /v1/keys/current</code></td><td>Yes</td><td>Revoke the key used for this request.</td></tr>
+    <tr><td><code>DELETE /v1/keys/current</code></td><td>Yes</td><td>Revoke the key used for this request. Not allowed with a passkey session.</td></tr>
+    <tr><td><code>POST /v1/passkeys/register/options</code> · <code>/verify</code></td><td>Owner key</td><td>Register a passkey (Touch ID, Face ID, Windows Hello, security key) for the owner key. Must be called from the portal origin.</td></tr>
+    <tr><td><code>POST /v1/passkeys/login/options</code> · <code>/verify</code></td><td>No</td><td>Sign in with a passkey. Returns a session token <code>ovs_…</code> (12 h) that acts as the owner key.</td></tr>
+    <tr><td><code>GET /v1/passkeys</code></td><td>Owner</td><td>List passkeys.</td></tr>
+    <tr><td><code>DELETE /v1/passkeys/{id}</code></td><td>Owner key</td><td>Remove a passkey and end its sessions.</td></tr>
+    <tr><td><code>DELETE /v1/sessions/current</code></td><td>Session</td><td>Sign out.</td></tr>
   </table></div>
 
   <h2>Ask: response</h2>
@@ -46,7 +51,7 @@
     <tr><td><code>general</code></td><td>No doc matched, <code>sources_only</code> is false, and the question isn't about Open Verse Ai</td><td><code>confidence: "unverified"</code>, no sources, includes <code>model</code> and <code>note</code></td></tr>
     <tr><td><code>none</code></td><td>Nothing applies</td><td><code>answered: false</code>, plus <code>general_unavailable</code> with the reason</td></tr>
   </table></div>
-  <p><strong>Owner keys</strong> (created only with a local script, never via the API) also get the owner's profile and up to 3 relevant past-chat excerpts as background for general answers, listed in <code>memory_sources</code> (<code>M1</code>–<code>M3</code>). Send <code>"use_memory": false</code> to skip it. Public keys never see memory.</p>
+  <p><strong>Owner keys</strong> (created only with a local script, never via the API) also get the owner's profile and up to 3 relevant excerpts from their own chats, Drive, sent email, Keep and Calendar as background for general answers, listed in <code>memory_sources</code> (<code>M1</code>–<code>M3</code>). Send <code>"use_memory": false</code> to skip it. Public keys never see memory.</p>
   <p>General answers are limited to 50 per key per UTC day. Questions about this API (keys, endpoints, limits) are never sent to the model, so it can't invent features.</p>
 
   <h2>Limits</h2>
@@ -57,8 +62,8 @@
   <div class="table-scroll"><table>
     <tr><th>Status</th><th>Codes</th></tr>
     <tr><td>400</td><td><code>empty_question</code>, <code>question_too_short</code>, <code>question_too_long</code>, <code>no_searchable_terms</code>, <code>invalid_top_k</code>, <code>invalid_sources_only</code>, <code>invalid_use_memory</code>, <code>invalid_json</code>, <code>invalid_label</code></td></tr>
-    <tr><td>401</td><td><code>missing_api_key</code>, <code>invalid_api_key</code>, <code>invalid_auth_header</code></td></tr>
-    <tr><td>403</td><td><code>owner_only</code></td></tr>
+    <tr><td>401</td><td><code>missing_api_key</code>, <code>invalid_api_key</code>, <code>invalid_auth_header</code>, <code>session_expired</code>, <code>unknown_passkey</code></td></tr>
+    <tr><td>403</td><td><code>owner_only</code>, <code>owner_key_required</code>, <code>origin_not_allowed</code></td></tr>
     <tr><td>404 / 405</td><td><code>not_found</code>, <code>method_not_allowed</code></td></tr>
     <tr><td>413 / 415</td><td><code>payload_too_large</code>, <code>unsupported_media_type</code></td></tr>
     <tr><td>429</td><td><code>rate_limited</code>, <code>quota_exceeded</code>, <code>key_limit</code></td></tr>

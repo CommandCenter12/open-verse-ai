@@ -87,19 +87,27 @@ cd worker && npm test
 | `GENERAL_PER_DAY` | `wrangler.toml` | no | Llama answers per key per UTC day (50) |
 | `GENERAL_GLOBAL_PER_DAY` | `wrangler.toml` | no | Llama answers across all keys per day (2000) |
 | `AI` binding | `wrangler.toml` `[ai]` | no | Workers AI; no API key needed |
+| `PASSKEY_ORIGINS` | `wrangler.toml` | no | Pages allowed to use passkeys (hostname = RP ID) |
+| `PASSKEY_ATTEMPTS_PER_HOUR` | `wrangler.toml` | no | Passkey attempts per network per hour (30) |
+| `SESSION_HOURS` | `wrangler.toml` | no | Passkey session lifetime (12) |
 
 ## Personal memory (owner only)
 
-Lets Open Verse Ai use your past Claude and Gemini chats plus a short profile as background, without sending whole logs.
+Lets Open Verse Ai use your past Claude and Gemini chats, your Google Takeout data (Drive files, **sent** Gmail, Keep, Calendar) and a short profile as background, without sending whole logs.
 
 ```
 private/exports/  ──build──▶  private/memory/chunks.jsonl  ──upload──▶  D1 memory_fts (FTS5) + memory_profile
 (raw, gitignored)   parse → redact → chunk    + private/profile.md (you write it)      ▲ read only for owner keys
 ```
 
-1. Put exports in `private/exports/` (any layout):
+1. Put exports in `private/exports/` (any layout; unzip Takeout there):
    - Claude: Settings → Privacy → Export data → `conversations.json`
-   - Gemini: Google Takeout → My Activity → **format: JSON** → `.../Gemini Apps/MyActivity.json`
+   - Google Takeout (takeout.google.com), select:
+     - **My Activity** → formats: **JSON** → keeps `.../Gemini Apps/MyActivity.json`
+     - **Drive** → Advanced settings: Documents as **DOCX** or **Plain text** (`.txt .md .html .docx` are read; PDFs and images are skipped)
+     - **Mail** → "All Mail data included" → deselect all, select **Sent** (only messages labelled Sent are ever kept; quoted replies and signatures are stripped)
+     - **Keep** and **Calendar** (event titles only, grouped per month; locations and attendees dropped)
+   - Limit sources with `--sources gmail,drive`; for a non-Gmail mbox pass `--me you@example.com`.
 2. `cd worker && npm run memory:build`, then review `private/memory/chunks.jsonl` and `redaction-report.txt`. Add strings that must not be redacted to `private/redact-allow.txt`.
 3. Copy `private/profile.draft.md` to `private/profile.md` and rewrite it (≤ ~200 words, no TODOs).
 4. `npm run memory:upload -- --remote --yes` (replaces all memory; re-run after new exports).
@@ -107,7 +115,19 @@ private/exports/  ──build──▶  private/memory/chunks.jsonl  ──uploa
 
 On owner requests that fall through to Llama, the profile and the top 3 matching chunks (≤ 700 chars each) are added to the prompt as labelled background, and returned in `memory_sources`. Docs and math answers never use memory. `"use_memory": false` turns it off per request. `POST /v1/memory/search` shows what would be retrieved.
 
-Limits: redaction is pattern-based, so review the chunks. Retrieval is keyword-based (FTS5 with stemming), so it can miss paraphrases. Retrieved chunks are sent to Workers AI.
+Limits: redaction is pattern-based (emails, phones, card numbers, keys/tokens, passwords), so review the chunks; names and street addresses inside text are not removed. Retrieval is keyword-based (FTS5 with stemming), so it can miss paraphrases. Retrieved chunks are sent to Workers AI.
+
+## Touch ID sign-in (passkeys)
+
+The portal's **Owner sign-in** box lets you use Touch ID, Face ID, Windows Hello or a security key instead of pasting the owner key.
+
+1. Once per device: open the portal → **Set up Touch ID on this device** → paste the owner key → **Register this device**.
+2. Afterwards: **Sign in with Touch ID**. You get a 12-hour session token (`ovs_…`) that acts as the owner key for asks, memory and usage.
+
+- Verification uses [`@simplewebauthn/server`](https://github.com/MasterKale/SimpleWebAuthn) (pinned). Every sign-in requires user verification (fingerprint/face), single-use challenges (5 min), origin and RP ID checks, and signature-counter checks.
+- A session **cannot** add or remove passkeys or revoke the owner key. Those need the owner key itself, so a stolen session can't make itself permanent.
+- Deleting a passkey or revoking the owner key ends its sessions immediately. Only token hashes are stored.
+- Passkeys are bound to the page's hostname (`PASSKEY_ORIGINS`), so one made on `localhost` won't work on GitHub Pages and vice versa. Synced passkeys (iCloud Keychain) work on your other Apple devices.
 
 ## Security model
 

@@ -22,7 +22,8 @@ const RULES = [
   ['iban', /\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}(?:\s?[A-Z0-9]{1,3})?\b/g],
   ['card', /\b(?:\d[ -]?){13,19}\b/g],
   ['ssn', /\b\d{3}-\d{2}-\d{4}\b/g],
-  ['phone', /(?<![\w.])\+?\d{1,3}?[ .-]?\(?\d{2,4}\)?[ .-]\d{3,4}[ .-]\d{3,4}(?![\w.])/g],
+  // Sentence-ending punctuation after a number is fine ("call +1 415-555-0199."); a following digit is not.
+  ['phone', /(?<![\w.])\+?\d{1,3}?[ .-]?\(?\d{2,4}\)?[ .-]\d{3,4}[ .-]\d{3,4}(?!\w|[.-]\d)/g],
   ['long_hex', /\b[a-f0-9]{40,}\b/gi],
 ];
 

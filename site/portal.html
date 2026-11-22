@@ -12,7 +12,30 @@
 <header class="nav"><div class="wrap"><a class="brand" href="index.html">Open Verse Ai</a><a href="index.html">Home</a><a href="docs.html">Docs</a><a href="portal.html" aria-current="page">API keys</a><a href="https://github.com/">GitHub</a></div></header>
 <main><div class="wrap">
   <h1>API keys</h1>
-  <p class="lead">Create a key, then try it below. Keys are never saved in this browser; the page keeps them only until you reload.</p>
+  <p class="lead">Create a key, then try it below. API keys are never saved in this browser. A Touch ID sign-in is kept for this tab only, until it expires or you sign out.</p>
+
+  <section class="card" aria-labelledby="owner-h" id="owner">
+    <h2 id="owner-h" style="margin-top:0">Owner sign-in</h2>
+    <div id="signed-out">
+      <p class="meta">Owners can sign in with Touch ID, Face ID or another passkey instead of pasting the owner key.</p>
+      <button id="pk-login">Sign in with Touch ID</button>
+    </div>
+    <div id="signed-in" hidden>
+      <p><strong>Signed in as owner</strong> <span class="meta" id="session-info"></span></p>
+      <div class="row"><button class="secondary" id="pk-logout">Sign out</button><button class="secondary" id="pk-list">My passkeys</button></div>
+      <ul class="sources" id="pk-items"></ul>
+    </div>
+    <details style="margin-top:16px">
+      <summary>Set up Touch ID on this device (once)</summary>
+      <p class="meta">Needs your owner key one time. After that, sign in with your fingerprint. The key isn't stored.</p>
+      <label for="pk-owner">Owner key</label>
+      <input id="pk-owner" type="password" autocomplete="off" spellcheck="false" placeholder="ova_…">
+      <label for="pk-label">Name for this device</label>
+      <input id="pk-label" maxlength="60" placeholder="e.g. MacBook Touch ID">
+      <button id="pk-register">Register this device</button>
+    </details>
+    <div class="status" id="pk-status" role="status"></div>
+  </section>
 
   <section class="card" aria-labelledby="create-h">
     <h2 id="create-h" style="margin-top:0">1. Create a key</h2>
@@ -30,7 +53,7 @@
   <section class="card" aria-labelledby="ask-h">
     <h2 id="ask-h" style="margin-top:0">2. Ask a question</h2>
     <label for="key">API key</label>
-    <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="ova_…">
+    <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="ova_… (leave empty when signed in with Touch ID)">
     <label for="question">Question</label>
     <textarea id="question" maxlength="500" placeholder="How many microsteps per revolution with 16x microstepping?"></textarea>
     <div class="row">

@@ -6,6 +6,17 @@ import { validateQuestion } from './qa.js';
 import { resolveAsk } from './ask.js';
 import { aiConfigured, DEFAULT_MODEL } from './general.js';
 import { loadMemory } from './memory.js';
+import {
+  passkeyContext, limitPasskeyAttempts, registrationOptions, registerPasskey,
+  authenticationOptions, signIn, listPasskeys, deletePasskey, cleanupPasskeys,
+} from './passkeys.js';
+
+// Owner API key presented directly (not a session). Used for actions a stolen
+// session must not be able to do: adding/removing passkeys, revoking the key.
+function requireOwnerKey(row) {
+  if (row.scope !== 'owner') throw new HttpError(403, 'owner_only', 'This endpoint requires an owner key.');
+  if (row.via !== 'key') throw new HttpError(403, 'owner_key_required', 'Use your owner API key for this, not a passkey session.');
+}
 import INDEX from './knowledge-index.json';
 
 async function route(request, env, ctx) {
@@ -51,6 +62,9 @@ async function route(request, env, ctx) {
   if (path === '/v1/keys/current') {
     if (method !== 'DELETE') throw new HttpError(405, 'method_not_allowed', 'Use DELETE.');
     const row = await authenticate(request, env.DB);
+    if (row.via === 'session') {
+      throw new HttpError(403, 'owner_key_required', 'A passkey session cannot revoke the owner key. Use DELETE /v1/sessions/current to sign out.');
+    }
     await revokeKey(env.DB, row.id);
     return json({ revoked: true, prefix: row.prefix });
   }
@@ -61,6 +75,8 @@ async function route(request, env, ctx) {
     return json({
       prefix: row.prefix,
       scope: row.scope,
+      via: row.via,
+      ...(row.via === 'session' ? { session_expires_at: new Date(row.session_expires_at * 1000).toISOString() } : {}),
       label: row.label,
       created_at: row.created_at,
       last_used_at: row.last_used_at,
@@ -100,6 +116,43 @@ async function route(request, env, ctx) {
     return json({ question, profile_present: Boolean(memory.profile), chunks: memory.chunks }, 200, rl);
   }
 
+  // ---------- Passkeys (Touch ID) ----------
+  if (path === '/v1/passkeys/register/options' || path === '/v1/passkeys/register/verify') {
+    if (method !== 'POST') throw new HttpError(405, 'method_not_allowed', 'Use POST.');
+    const ctx = passkeyContext(request, env);
+    const row = await authenticate(request, env.DB);
+    requireOwnerKey(row);
+    await limitPasskeyAttempts(request, env);
+    if (path.endsWith('/options')) return json(await registrationOptions(env.DB, row, ctx));
+    return json(await registerPasskey(env.DB, row, ctx, await readJson(request)), 201);
+  }
+  if (path === '/v1/passkeys/login/options' || path === '/v1/passkeys/login/verify') {
+    if (method !== 'POST') throw new HttpError(405, 'method_not_allowed', 'Use POST.');
+    const ctx = passkeyContext(request, env);
+    await limitPasskeyAttempts(request, env);
+    if (path.endsWith('/options')) return json(await authenticationOptions(env.DB, ctx));
+    return json(await signIn(env.DB, ctx, await readJson(request), env));
+  }
+  if (path === '/v1/passkeys') {
+    if (method !== 'GET') throw new HttpError(405, 'method_not_allowed', 'Use GET.');
+    const row = await authenticate(request, env.DB);
+    if (row.scope !== 'owner') throw new HttpError(403, 'owner_only', 'This endpoint requires an owner key.');
+    return json({ passkeys: await listPasskeys(env.DB, row.id) });
+  }
+  if (path.startsWith('/v1/passkeys/')) {
+    if (method !== 'DELETE') throw new HttpError(405, 'method_not_allowed', 'Use DELETE.');
+    const row = await authenticate(request, env.DB);
+    requireOwnerKey(row);
+    return json(await deletePasskey(env.DB, row.id, decodeURIComponent(path.slice('/v1/passkeys/'.length))));
+  }
+  if (path === '/v1/sessions/current') {
+    if (method !== 'DELETE') throw new HttpError(405, 'method_not_allowed', 'Use DELETE.');
+    const row = await authenticate(request, env.DB);
+    if (row.via !== 'session') throw new HttpError(400, 'not_a_session', 'Send the session token (ovs_…) to sign out.');
+    await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(row.session_hash).run();
+    return json({ signed_out: true });
+  }
+
   throw new HttpError(404, 'not_found', `No route for ${method} ${path}.`);
 }
 
@@ -117,6 +170,6 @@ export default {
   },
 
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(cleanup(env.DB));
+    ctx.waitUntil(Promise.all([cleanup(env.DB), cleanupPasskeys(env.DB).catch(() => {})]));
   },
 };

@@ -131,6 +131,11 @@ check "/v1/me day.used +6 +accepted ($((DAY0 + 6 + OK200)))" "$(echo "$ME" | jq_
 RAW=$(d1 "SELECT max(count) AS c FROM counters WHERE bucket >= 'ask:d:$HASH:' AND bucket < 'ask:d:$HASH;'")
 check "raw D1 day counter (no display clamp)" "$(echo "$RAW" | jq_ 'r[0].results[0].c')" "$((DAY0 + 6 + OK200))"
 
+echo "== Passkeys"
+check "passkey sign-in refused from a foreign origin" "$(code -X POST "$API/v1/passkeys/login/options" -H 'Origin: https://evil.example' -H 'Content-Type: application/json' -d '{}')" 403
+check "passkey sign-in options from the portal origin" "$(code -X POST "$API/v1/passkeys/login/options" -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -d '{}')" 200
+check "public key can't register a passkey" "$(code -X POST "$API/v1/passkeys/register/options" -H "Origin: $ORIGIN" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d '{}')" "$([ "$(curl -s "$API/v1/me" -H "Authorization: Bearer $KEY" | jq_ 'r.scope')" = owner ] && echo 200 || echo 403)"
+
 echo "== CORS"
 A=$(curl -s -o /dev/null -D - -X OPTIONS "$API/v1/ask" -H "Origin: $ORIGIN" -H 'Access-Control-Request-Method: POST' | grep -i '^access-control-allow-origin' | awk '{print $2}' | tr -d '\r')
 check "Pages origin allowed" "$A" "$ORIGIN"

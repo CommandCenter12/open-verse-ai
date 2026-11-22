@@ -14,6 +14,11 @@ GENERAL_ENABLED = "true"
 AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 GENERAL_PER_DAY = "50"           # per key, per UTC day
 GENERAL_GLOBAL_PER_DAY = "2000"  # all keys combined: caps your Workers AI bill
+# Passkey (Touch ID) sign-in. Origins of pages allowed to use it; each origin's
+# hostname is the WebAuthn RP ID. Passkeys made on one origin only work there.
+PASSKEY_ORIGINS = "https://commandcenter12.github.io,http://localhost:8080"
+PASSKEY_ATTEMPTS_PER_HOUR = "30"  # per network
+SESSION_HOURS = "12"
 
 # Cloudflare Workers AI. In `wrangler dev` this binding always calls the real
 # service and uses your account's Workers AI allowance.

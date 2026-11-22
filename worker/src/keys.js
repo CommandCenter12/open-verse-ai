@@ -3,6 +3,7 @@ import { HttpError } from './http.js';
 
 export const KEY_PREFIX = 'ova_';
 const KEY_RE = /^ova_[A-Za-z0-9_-]{43}$/; // 32 random bytes, base64url, no padding
+const SESSION_RE = /^ovs_[A-Za-z0-9_-]{43}$/; // passkey sign-in session (see passkeys.js)
 
 function base64url(bytes) {
   let s = '';
@@ -60,6 +61,17 @@ export async function authenticate(request, db) {
       'WWW-Authenticate': 'Bearer',
     });
   }
+  if (SESSION_RE.test(key)) {
+    const s = await db
+      .prepare(
+        'SELECT k.*, s.token_hash AS session_hash, s.expires_at AS session_expires_at FROM sessions s ' +
+          'JOIN api_keys k ON k.id = s.key_id WHERE s.token_hash = ? AND s.expires_at > ? AND k.revoked_at IS NULL'
+      )
+      .bind(await sha256Hex(key), Math.floor(Date.now() / 1000))
+      .first();
+    if (!s) throw new HttpError(401, 'session_expired', 'Session expired or signed out. Sign in with your passkey again.', { 'WWW-Authenticate': 'Bearer' });
+    return { ...s, scope: s.scope === 'owner' ? 'owner' : 'public', via: 'session' };
+  }
   if (!isWellFormed(key)) {
     throw new HttpError(401, 'invalid_api_key', 'API key is malformed.', { 'WWW-Authenticate': 'Bearer' });
   }
@@ -72,7 +84,7 @@ export async function authenticate(request, db) {
   if (!row) {
     throw new HttpError(401, 'invalid_api_key', 'API key is unknown or revoked.', { 'WWW-Authenticate': 'Bearer' });
   }
-  return { ...row, scope: row.scope === 'owner' ? 'owner' : 'public' };
+  return { ...row, scope: row.scope === 'owner' ? 'owner' : 'public', via: 'key' };
 }
 
 export async function touchKey(db, id) {

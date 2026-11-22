@@ -1,0 +1,3 @@
+Encoder notes for the CNC project.
+
+The Z axis uses a 600 line quadrature encoder, which gives 2400 counts per revolution with 4x decoding.

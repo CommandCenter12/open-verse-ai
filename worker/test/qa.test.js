@@ -51,3 +51,39 @@ test('keys are random, well-formed and hashed to 64 hex chars', async () => {
   assert.ok(!isWellFormed('ova_short'));
   assert.match(await sha256Hex(a), /^[0-9a-f]{64}$/);
 });
+
+// Retrieval regression set: right section, or an honest refusal (null).
+// Add a case whenever a question is answered from the wrong section.
+const ROUTING = {
+  'Does Open Verse Ai have a /v1/translate endpoint?': null,
+  'Can Open Verse Ai send emails?': null,
+  'best pizza in Naples': null,
+  'What is the capital of France?': null,
+  'How do I tune a PID controller?': 'Tuning a PID controller',
+  'How do I tune a PID controller quickly?': 'Tuning a PID controller',
+  'Explain integral windup': 'PID control',
+  'How do encoders work?': 'Encoders',
+  'How does an H-bridge work?': 'H-bridge motor driver',
+  'What is PWM duty cycle?': 'PWM (pulse width modulation)',
+  'What is gear ratio torque?': 'Gear ratio',
+  'How many microsteps per revolution with 16x microstepping?': 'Stepper motor',
+  'What is ADC resolution?': 'ADC resolution and sampling',
+  'How is RSI calculated?': 'Relative strength index (RSI)',
+  'What is the P/E ratio?': 'Price to earnings ratio (P/E)',
+  'What is EPS?': 'Earnings per share (EPS)',
+  'What is a death cross?': 'Moving averages',
+  'What is the Sharpe ratio of my portfolio?': 'Sharpe ratio',
+  'What happens if I exceed the rate limit?': 'Rate limits and quotas',
+  'How do I revoke a key?': 'Revoking a key',
+  'How do I add knowledge?': 'Adding knowledge',
+};
+
+test('retrieval routes each question to the right section or refuses', () => {
+  const misses = [];
+  for (const [q, want] of Object.entries(ROUTING)) {
+    const r = ask(q);
+    const got = r.answered ? r.sources[0].section : null;
+    if (got !== want) misses.push(`${q} → ${got} (want ${want})`);
+  }
+  assert.deepEqual(misses, []);
+});

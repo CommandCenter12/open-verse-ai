@@ -12,13 +12,16 @@ function stem(t) {
   if (t.length > 4 && t.endsWith('ies')) t = t.slice(0, -3) + 'y';
   else if (t.length > 3 && t.endsWith('s') && !t.endsWith('ss') && !t.endsWith('us') && !t.endsWith('is')) t = t.slice(0, -1);
   if (t.length > 5 && t.endsWith('ing')) t = t.slice(0, -3);
-  else if (t.length > 4 && t.endsWith('ed')) t = t.slice(0, -2);
+  else if (t.length > 4 && t.endsWith('ed') && !t.endsWith('eed')) t = t.slice(0, -2); // exceed, speed stay whole
+  if (/([bdgmnprt])\1$/.test(t) && t.length > 3) t = t.slice(0, -1); // getting→get, stopped→stop
   if (t.length > 3 && t.endsWith('e')) t = t.slice(0, -1);
   return t;
 }
 
 export function tokenize(text) {
   return String(text)
+    .replace(/\b([a-z])\/([a-z])\b/gi, '$1$2') // P/E → pe, R/R → rr (else both letters are dropped)
+    .replace(/\b(\d+)\s*[x×]\b/gi, '$1 ') // 16x / 16× → 16
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')

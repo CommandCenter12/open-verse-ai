@@ -1,0 +1,75 @@
+From 1789000000000000001@xxx Thu Mar 12 10:00:00 +0000 2026
+X-Gmail-Labels: Sent,Important
+Message-ID: <m1@example.com>
+Date: Thu, 12 Mar 2026 10:00:00 +0000
+From: Jane Student <jane.test@example.com>
+To: Prof Smith <prof.smith@example.edu>
+Subject: Bassinet clamp prototype update
+Content-Type: text/plain; charset=UTF-8
+
+Hi Professor Smith,
+
+The bassinet mobile clamp prototype now holds 1.8 N·m on the thumb screw.
+I switched the pad to silicone so it doesn't mark the rail.
+>From now on I'll print the jaws in PETG.
+
+--
+Jane
+Mechatronics, year 2
+
+On Wed, 11 Mar 2026 at 09:00, Prof Smith <prof.smith@example.edu> wrote:
+> Please send the torque numbers.
+
+From 1789000000000000002@xxx Thu Mar 12 11:00:00 +0000 2026
+X-Gmail-Labels: Inbox,Unread
+Message-ID: <m2@example.com>
+Date: Thu, 12 Mar 2026 11:00:00 +0000
+From: Newsletter <news@example.org>
+Subject: Weekly deals
+Content-Type: text/plain
+
+Buy things now, this received email must never be indexed.
+
+From 1789000000000000003@xxx Fri Mar 13 09:00:00 +0000 2026
+X-Gmail-Labels: Sent
+Message-ID: <m3@example.com>
+Date: Fri, 13 Mar 2026 09:00:00 +0000
+From: jane.test@example.com
+Subject: =?UTF-8?B?UmU6IFN0ZXBwZXIgbW90b3Igc2l6aW5nIOKAkyBDTkM=?=
+Content-Type: multipart/alternative; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+For the CNC router I picked a NEMA 23 stepper =E2=80=93 about 1.9 N=C2=B7m hold=
+ing torque with 1/8 microstepping.
+Sent from my iPhone
+
+--b1
+Content-Type: text/html; charset=UTF-8
+
+<p>HTML version should be ignored when plain text exists</p>
+--b1--
+
+From 1789000000000000004@xxx Sat Mar 14 09:00:00 +0000 2026
+X-Gmail-Labels: Sent
+Message-ID: <m4@example.com>
+Date: Sat, 14 Mar 2026 09:00:00 +0000
+From: jane.test@example.com
+Subject: Fwd: RSI backtest notes
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: base64
+
+PHA+TXkgUlNJIGJhY2t0ZXN0IG9uIFNQWSB1c2VkIGEgMTQtZGF5IGxvb2tiYWNrIGFuZCBleGl0
+cyBhdCBSU0kgNzAuPC9wPjxwPkNhbGwgbWUgYXQgKzEgNDE1LTU1NS0wMTk5LjwvcD4=
+
+From 1789000000000000005@xxx Sat Mar 14 10:00:00 +0000 2026
+X-Gmail-Labels: Sent,Chat
+Message-ID: <m5@example.com>
+Date: Sat, 14 Mar 2026 10:00:00 +0000
+From: jane.test@example.com
+Subject: chat
+Content-Type: text/plain
+
+this is a hangouts chat and should be skipped

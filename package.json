@@ -1,0 +1,17 @@
+{
+  "name": "open-verse-ai",
+  "private": true,
+  "description": "Shortcuts so worker/ scripts also run from the repo root.",
+  "scripts": {
+    "test": "npm --prefix worker test",
+    "dev": "npm --prefix worker run dev",
+    "deploy": "npm --prefix worker run deploy",
+    "db:local": "npm --prefix worker run db:local",
+    "db:remote": "npm --prefix worker run db:remote",
+    "build:index": "npm --prefix worker run build:index",
+    "memory:build": "npm --prefix worker run memory:build --",
+    "memory:upload": "npm --prefix worker run memory:upload --",
+    "memory:owner-key": "npm --prefix worker run memory:owner-key --",
+    "verify": "scripts/verify-live.sh"
+  }
+}

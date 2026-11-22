@@ -1,4 +1,4 @@
-// Owner-only personal memory: chat-history chunks (FTS5) + a hand-written profile.
+// Owner-only personal memory: chunks from AI chats and Google Takeout (FTS5) + a hand-written profile.
 // Never call this for public keys. Errors degrade to "no memory", never to a 500.
 import { contentWords } from './tokenize.js';
 

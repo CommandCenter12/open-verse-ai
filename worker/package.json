@@ -11,12 +11,15 @@
     "db:remote": "wrangler d1 migrations apply open-verse-ai --remote",
     "predeploy": "npm run build:index",
     "deploy": "wrangler deploy",
-    "test": "npm run build:index && node --test test/",
+    "test": "npm run build:index && node --import ./test/setup.mjs --test test/",
     "memory:build": "node ../scripts/memory/build.mjs",
     "memory:upload": "node ../scripts/memory/upload.mjs",
     "memory:owner-key": "node ../scripts/memory/owner-key.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "14.0.3"
   }
 }
