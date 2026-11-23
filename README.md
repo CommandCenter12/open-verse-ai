@@ -141,6 +141,7 @@ Every page of the site is behind a lock screen like Command Center's.
 
 - **First time on a device:** paste your owner key and choose an 8-digit PIN. The key is encrypted with AES-GCM using a key from your PIN (PBKDF2-SHA256, 600,000 rounds) and stored **only in that browser** (`localStorage`). It is never published, so the PIN can't be brute-forced from the internet.
 - **Unlock:** PIN, or Touch ID / Face ID after tapping **Enable Touch ID** (two taps). Touch ID uses the passkey PRF secret to decrypt the key; browsers without PRF fall back to a non-extractable key kept in that browser.
+- **Two-step (PIN + Touch ID):** tap **Turn on two-step** (two taps, then confirm your PIN). The key is then encrypted with `HKDF(PBKDF2(PIN) ‖ PRF(passkey))`, so the PIN alone or the fingerprint alone cannot decrypt it; the old Touch-ID-only shortcut is removed. Needs a browser whose passkeys support PRF (recent Safari, or Chrome with iCloud Keychain / Google Password Manager); otherwise it refuses and the PIN lock stays as is. To turn it off or after losing the passkey: **Forget this device** and set up again with your owner key.
 - After 5 wrong PINs the screen waits 30 s, doubling up to 1 h. It auto-locks after 5 minutes idle; the unlocked key lives only in that tab.
 - **Forget this device** wipes the saved key and Touch ID from the browser.
 - The page HTML itself is public in this repo; what the lock protects is your owner key, and the API keys protect your data.
