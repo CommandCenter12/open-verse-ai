@@ -4,7 +4,7 @@ import { createKey, authenticate, touchKey, revokeKey, sha256Hex } from './keys.
 import { enforceAsk, usage, hit, intVar, windows, cleanup, reserveGeneral } from './ratelimit.js';
 import { validateQuestion } from './qa.js';
 import { resolveAsk } from './ask.js';
-import { aiConfigured, DEFAULT_MODEL } from './general.js';
+import { aiConfigured, DEFAULT_MODEL, MODELS, MODEL_ORDER, modelChain } from './general.js';
 import { loadMemory } from './memory.js';
 import { parseCommand, handleCommand, shouldLearn, saveConversation, pruneLearned, LEARNED_SOURCE } from './learn.js';
 import {
@@ -32,6 +32,15 @@ async function route(request, env, ctx) {
       service: 'open-verse-ai',
       index: { chunks: INDEX.N, built_at: INDEX.builtAt },
       general: { enabled: aiConfigured(env), model: env.AI_MODEL || DEFAULT_MODEL },
+    });
+  }
+
+  if (path === '/v1/models') {
+    if (method !== 'GET') throw new HttpError(405, 'method_not_allowed', 'Use GET.');
+    return json({
+      default: 'auto',
+      auto_order: modelChain(env, 'auto'),
+      models: MODEL_ORDER.map((k) => ({ key: k, ...MODELS[k] })),
     });
   }
 
@@ -89,7 +98,7 @@ async function route(request, env, ctx) {
     if (method !== 'POST') throw new HttpError(405, 'method_not_allowed', 'Use POST.');
     const row = await authenticate(request, env.DB);
     const body = await readJson(request); // validate before spending quota
-    const { question, topK, sourcesOnly, useMemory } = validateQuestion(body);
+    const { question, topK, sourcesOnly, useMemory, model, style } = validateQuestion(body);
     const rl = await enforceAsk(env.DB, row.key_hash, env);
     ctx.waitUntil(touchKey(env.DB, row.id));
     const learning = row.scope === 'owner' && useMemory && env.MEMORY_LEARN !== 'false';
@@ -104,6 +113,8 @@ async function route(request, env, ctx) {
       sourcesOnly,
       env,
       reserveGeneral: () => reserveGeneral(env.DB, row.key_hash, env),
+      model,
+      style,
       // Personal memory is only ever read for owner keys.
       loadMemory: row.scope === 'owner' && useMemory ? () => loadMemory(env.DB, question) : null,
       // Approximate location of the caller (from Cloudflare), only for "weather" with no city.

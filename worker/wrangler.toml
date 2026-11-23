@@ -11,7 +11,9 @@ QUOTA_PER_DAY = "500"
 KEYS_PER_IP_DAY = "20"
 # General (non-docs) answers via Workers AI. Set GENERAL_ENABLED = "false" to turn off.
 GENERAL_ENABLED = "true"
-AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+AI_MODEL = "@cf/qwen/qwen3.8-27b"  # Alibaba Qwen (open weights): main model
+# Fallbacks follow MODEL_ORDER in src/general.js (Gemma 4 → Llama 4 → Llama 3.3 → Mistral).
+# Set AI_FALLBACK_MODEL = "none" to disable fallbacks.
 GENERAL_PER_DAY = "50"           # per key, per UTC day
 GENERAL_GLOBAL_PER_DAY = "2000"  # all keys combined: caps your Workers AI bill
 # Server-side passkey sign-in (/v1/passkeys/*). Off: the site now uses the local

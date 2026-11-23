@@ -21,7 +21,7 @@ export const MIN_COVERAGE = 0.5; // share of distinct query terms the best chunk
 // Same, but each term weighted by rarity (IDF; words absent from the docs count as rarest).
 // Stops "Does X have a /v1/translate endpoint?" matching on the common words while the
 // one word that matters ("translate") appears nowhere.
-export const MIN_WEIGHTED_COVERAGE = 0.5;
+export const MIN_WEIGHTED_COVERAGE = 0.55; // > half: a borderline half-match (e.g. 'square root' in Volatility) is not an answer
 
 export function validateQuestion(body) {
   const q = body.question;
@@ -45,6 +45,19 @@ export function validateQuestion(body) {
     }
     sourcesOnly = body.sources_only;
   }
+  let model = 'auto';
+  if (body.model !== undefined) {
+    const ok = ['auto', 'qwen', 'gemma', 'llama4', 'llama', 'mistral'];
+    if (typeof body.model !== 'string' || !ok.includes(body.model)) {
+      throw new HttpError(400, 'invalid_model', `"model" must be one of: ${ok.join(', ')}.`);
+    }
+    model = body.model;
+  }
+  let style = 'simple';
+  if (body.style !== undefined) {
+    if (body.style !== 'simple' && body.style !== 'original') throw new HttpError(400, 'invalid_style', '"style" must be "simple" or "original".');
+    style = body.style;
+  }
   let useMemory = true;
   if (body.use_memory !== undefined) {
     if (typeof body.use_memory !== 'boolean') {
@@ -52,7 +65,7 @@ export function validateQuestion(body) {
     }
     useMemory = body.use_memory;
   }
-  return { question, topK, sourcesOnly, useMemory };
+  return { question, topK, sourcesOnly, useMemory, model, style };
 }
 
 export function search(index, queryTerms, topK) {

@@ -36,12 +36,20 @@ test('math: exact arithmetic without the model', async () => {
   assert.equal(tryMath('2^^3'), null);
 });
 
-test('docs answers keep citations and never call the model', async () => {
-  const { r, ai, reserved } = await run('How do I tune a PID controller?');
+test('docs answers: original style never calls a model; simple style keeps citations + original', async () => {
+  let r, ai;
+  ({ r, ai } = await run('How do I tune a PID controller?', { env: {} }).then((x) => x));
+  // default style is simple: one rewrite call, citations unchanged, original kept
   assert.equal(r.mode, 'docs');
+  assert.equal(r.style, 'simple');
+  assert.equal(ai.calls.length, 1);
   assert.match(r.sources[0].url, /CommandCenter12\/open-verse-ai\/blob\/main\/knowledge\//);
+  assert.match(r.original_answer, /set Ki and Kd to zero/);
+  const orig = await resolveAsk({ index: INDEX, question: 'How do I tune a PID controller?', topK: 3, sourcesOnly: false, style: 'original', log: quiet,
+    env: { REPO_URL, AI: (ai = fakeAI()) }, reserveGeneral: async () => ({ ok: true }) });
+  assert.equal(orig.style, 'original');
   assert.equal(ai.calls.length, 0);
-  assert.equal(reserved(), 0);
+  assert.match(orig.answer, /set Ki and Kd to zero/);
 });
 
 test('general fallback uses Llama with a labelled, uncited answer', async () => {
@@ -51,7 +59,7 @@ test('general fallback uses Llama with a labelled, uncited answer', async () => 
   assert.equal(r.confidence, 'unverified');
   assert.deepEqual(r.sources, []);
   assert.match(r.note, /not from the Open Verse Ai knowledge base/);
-  assert.equal(ai.calls[0].model, '@cf/meta/llama-3.3-70b-instruct-fp8-fast');
+  assert.equal(ai.calls[0].model, '@cf/qwen/qwen3.8-27b');
   assert.equal(ai.calls[0].input.messages[1].content, 'What is the capital of France?');
   assert.equal(reserved(), 1);
 });

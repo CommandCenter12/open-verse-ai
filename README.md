@@ -119,6 +119,22 @@ On owner requests that fall through to Llama, the profile and the top 3 matching
 
 Limits: redaction is pattern-based (emails, phones, card numbers, keys/tokens, passwords), so review the chunks; names and street addresses inside text are not removed. Retrieval is keyword-based (FTS5 with stemming), so it can miss paraphrases. Retrieved chunks are sent to Workers AI.
 
+## Models and exact math
+
+| `model` | Model (open weights) | In our tests |
+|---|---|---|
+| `qwen` (auto, first) | Qwen 3.8 27B, Alibaba | best at math; complete formulas; fastest tool calls |
+| `gemma` | Gemma 4 26B, Google | correct on all checks |
+| `llama4` | Llama 4 Scout 17B, Meta | correct on all checks |
+| `llama` | Llama 3.3 70B, Meta | fast; cut a long math answer short |
+| `mistral` | Mistral Small 3.1 24B | fast; wrong on a physics check, so last |
+
+`auto` tries Qwen → Gemma → Llama 4 (max 3 per question); a chosen `model` goes first. Questions with numbers get a `calculate` tool: the model writes the formula, the Worker computes it exactly (`src/math.js`: + − × ÷ ^, sqrt, ln/log, exp, trig, pi, e, …), and results are returned in `calculations`. Not on Workers AI: Mixtral, Phi-3 and NVIDIA Nemotron (these could run on the Mac mini via Ollama later).
+
+## Reading level (all answers)
+
+Default `"style": "simple"`: every answer is written at a 9th-grade level (everyday words, short sentences, technical terms explained in parentheses) without dropping facts, numbers, units, formulas or steps. Docs answers are rewritten by a model (Llama 4 first) and **rejected if any number from the original is missing**, falling back to the original wording (`simplify_skipped`). `original_answer` always carries the exact docs text. `"style": "original"` turns this off.
+
 ## Live data tools
 
 Weather and market-price questions skip the docs. Llama picks a tool (`get_weather`, `get_stock_quote`) and its arguments (it fixes typos like "nvidea" → NVDA); the Worker fetches the data (Open-Meteo, Yahoo Finance chart API: free, no keys, Yahoo is unofficial and may be delayed or blocked) and Llama words the answer from it. If the model doesn't call a tool on an obvious live question, the Worker fetches anyway. Answers come back as `mode: "live"` with the raw data in `live_data`. Turn off with `TOOLS_ENABLED = "false"`.

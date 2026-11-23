@@ -9,7 +9,7 @@ import { tokenize } from './tokenize.js';
 import { HttpError } from './http.js';
 import { answer as docsAnswer } from './qa.js';
 import { tryMath } from './math.js';
-import { aiConfigured, generalAnswer, isProjectQuestion } from './general.js';
+import { aiConfigured, generalAnswer, isProjectQuestion, simplify } from './general.js';
 import { liveIntent } from './tools.js';
 
 const NO_DOCS_MESSAGE =
@@ -22,7 +22,7 @@ function notAnswered(question, extra = {}) {
 
 // reserveGeneral(): Promise<{ ok: true } | { ok: false, reason: string }> – consumes general quota.
 // loadMemory(): Promise<{ profile, chunks }> – owner keys only; null for everyone else.
-export async function resolveAsk({ index, question, topK, sourcesOnly, env, reserveGeneral, loadMemory = null, where = null, log = console }) {
+export async function resolveAsk({ index, question, topK, sourcesOnly, env, reserveGeneral, loadMemory = null, where = null, model = 'auto', style = 'simple', log = console }) {
   const math = tryMath(question);
   if (math) {
     if (math.error) {
@@ -44,7 +44,15 @@ export async function resolveAsk({ index, question, topK, sourcesOnly, env, rese
   // Weather and market-price questions need live data, not the docs.
   const live = !sourcesOnly && aiConfigured(env) && env.TOOLS_ENABLED !== 'false' && liveIntent(question);
   const docs = hasTerms && !live ? docsAnswer(index, question, topK, env.REPO_URL) : notAnswered(question);
-  if (docs.answered) return docs;
+  if (docs.answered) {
+    // Docs answers are exact sentences; rewrite them for a 9th grader unless style is "original".
+    if (style !== 'simple' || !aiConfigured(env)) return { ...docs, style: 'original' };
+    const reserved = await reserveGeneral();
+    if (!reserved.ok) return { ...docs, style: 'original', simplify_skipped: reserved.reason };
+    const s = await simplify(env, question, docs.answer);
+    if (!s.ok) return { ...docs, style: 'original', simplify_skipped: s.reason };
+    return { ...docs, answer: s.text, original_answer: docs.answer, style: 'simple', simplified_by: s.model };
+  }
 
   const generalAllowed = !sourcesOnly && aiConfigured(env) && !isProjectQuestion(question);
   if (!generalAllowed) {
@@ -60,7 +68,8 @@ export async function resolveAsk({ index, question, topK, sourcesOnly, env, rese
 
   const memory = loadMemory ? await loadMemory() : null;
   try {
-    return { ...(await generalAnswer(env, question, memory, { where })), nearest_topics: docs.nearest_topics };
+    const extra = style === 'original' ? { styleOverride: 'Write in your normal style.' } : {};
+    return { ...(await generalAnswer(env, question, memory, { where, model, ...extra })), style, nearest_topics: docs.nearest_topics };
   } catch (err) {
     log.error('general answer failed', err && err.message);
     return { ...docs, general_unavailable: 'error' };

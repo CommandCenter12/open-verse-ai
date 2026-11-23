@@ -71,18 +71,22 @@
     setStatus(st, 'Searching the knowledge base…');
     $('result').hidden = true;
     try {
-      const r = await call('/v1/ask', { method: 'POST', key, body: { question } });
+      const model = $('model') ? $('model').value : 'auto';
+      const r = await call('/v1/ask', { method: 'POST', key, body: model === 'auto' ? { question } : { question, model } });
       $('sources').replaceChildren();
       if (r.answered) {
         $('answer').textContent = r.answer;
+        $('original-wrap').hidden = !r.original_answer;
+        $('original').textContent = r.original_answer || '';
         const label = {
           docs: 'From the knowledge base',
           math: 'Calculated',
           live: 'Live data (' + (r.live_data || []).map((d) => d.source).filter(Boolean).join(', ') + ')',
           memory: 'Memory',
-          general: 'General AI answer (' + r.model + '), not from the docs',
+          general: 'AI answer (' + r.model + ')' + (r.calculations ? ', numbers computed exactly' : '') + ', not from the docs',
         }[r.mode] || r.mode;
-        $('confidence').textContent = label + ' · confidence: ' + r.confidence + (r.learned ? ' · saved to memory' : '');
+        const by = r.fallback_from ? ' · ' + r.fallback_from + ' was unavailable, answered by ' + r.model : '';
+        $('confidence').textContent = label + ' · confidence: ' + r.confidence + (r.learned ? ' · saved to memory' : '') + by;
         for (const s of r.sources) {
           const li = document.createElement('li');
           const title = document.createElement(s.url ? 'a' : 'strong');

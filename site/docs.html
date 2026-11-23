@@ -25,7 +25,8 @@
     <tr><td><code>GET /v1/health</code></td><td>No</td><td>Service status and index size.</td></tr>
     <tr><td><code>POST /v1/keys</code></td><td>No</td><td>Create a key. Body: <code>{"label":"optional"}</code>. Key returned once. 20 per network per UTC day.</td></tr>
     <tr><td><code>GET /v1/me</code></td><td>Yes</td><td>Key prefix, label and current usage.</td></tr>
-    <tr><td><code>POST /v1/ask</code></td><td>Yes</td><td>Ask a question. Body: <code>{"question":"…","top_k":3,"sources_only":false}</code>.</td></tr>
+    <tr><td><code>POST /v1/ask</code></td><td>Yes</td><td>Ask a question. Body: <code>{"question":"…","top_k":3,"sources_only":false,"model":"auto","style":"simple"}</code>. <code>style</code>: <code>simple</code> (default: 9th-grade wording, all facts and numbers kept; docs answers also return <code>original_answer</code>) or <code>original</code>. <code>model</code>: <code>auto</code>, <code>qwen</code>, <code>gemma</code>, <code>llama4</code>, <code>llama</code>, <code>mistral</code>.</td></tr>
+    <tr><td><code>GET /v1/models</code></td><td>No</td><td>The open-weight models available and the automatic fallback order.</td></tr>
     <tr><td><code>GET /v1/memory/facts</code> · <code>DELETE /v1/memory/facts/{id}</code></td><td>Owner</td><td>List or delete saved facts; shows how many conversations were learned.</td></tr>
     <tr><td><code>POST /v1/memory/search</code></td><td>Owner</td><td>Show which personal-memory chunks a question would retrieve. Public keys get <code>403 owner_only</code>.</td></tr>
     <tr><td><code>DELETE /v1/keys/current</code></td><td>Yes</td><td>Revoke the key used for this request. Not allowed with a passkey session.</td></tr>

@@ -23,6 +23,15 @@
     <label for="key">API key</label>
     <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="ova_… (empty = your unlocked owner key)">
     </details>
+    <label for="model">Model</label>
+    <select id="model" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font:inherit">
+      <option value="auto">Auto: best available (Qwen, then backups)</option>
+      <option value="qwen">Qwen 3.8 27B (Alibaba): math &amp; reasoning</option>
+      <option value="gemma">Gemma 4 26B (Google)</option>
+      <option value="llama4">Llama 4 Scout 17B (Meta)</option>
+      <option value="llama">Llama 3.3 70B (Meta): fast</option>
+      <option value="mistral">Mistral Small 3.1 24B</option>
+    </select>
     <label for="question">Question</label>
     <textarea id="question" maxlength="500" placeholder="How many microsteps per revolution with 16x microstepping?"></textarea>
     <div class="row">
@@ -34,6 +43,7 @@
     <div id="result" hidden>
       <p class="meta" id="confidence"></p>
       <p class="answer" id="answer"></p>
+      <details id="original-wrap" hidden><summary class="meta">Show original wording</summary><p class="answer meta" id="original"></p></details>
       <p class="meta" id="disclaimer"></p>
       <ol class="sources" id="sources"></ol>
     </div>

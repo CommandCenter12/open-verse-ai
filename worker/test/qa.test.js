@@ -76,6 +76,9 @@ const ROUTING = {
   'What happens if I exceed the rate limit?': 'Rate limits and quotas',
   'How do I revoke a key?': 'Revoking a key',
   'How do I add knowledge?': 'Adding knowledge',
+  'What is the square root of -4 in real numbers?': null,
+  'How is volatility annualized?': 'Volatility',
+  'Which models does Open Verse Ai use?': 'Models',
 };
 
 test('retrieval routes each question to the right section or refuses', () => {

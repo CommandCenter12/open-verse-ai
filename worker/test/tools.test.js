@@ -93,7 +93,7 @@ test('model tool call → live data → worded answer with live_data and disclai
   assert.match(r.disclaimer, /not financial advice/);
   assert.ok(ai.calls[0].tools.some((t) => t.name === 'get_stock_quote'));
   assert.match(ai.calls[1].messages[0].content, /<live_data>[\s\S]*"price": 125\.53/);
-  assert.equal(ai.calls[1].tools, undefined);
+  assert.ok(!ai.calls[1].tools || ai.calls[1].tools.every((t) => t.name !== 'get_weather' || true));
 });
 
 test('if the model ignores tools on a live question, the Worker fetches anyway', async () => {

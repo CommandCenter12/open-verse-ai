@@ -1,3 +1,4 @@
+import { evaluate } from './math.js';
 // Live-data tools for general answers: current weather (Open-Meteo, no key) and
 // stock quotes (Yahoo Finance chart endpoint, unofficial, no key).
 // The model only chooses a tool and its arguments; the Worker fetches the data
@@ -22,6 +23,25 @@ const MARKET_RE = new RegExp(
   ].join('|'),
   'i'
 );
+
+// Questions involving numbers get the exact calculator tool.
+const NUMERIC_RE = /\d|\b(calculate|compute|solve|how (much|many|long|far|fast)|percent(age)?|average|mean|median|sum|total|equation|interest|payment|area|volume|perimeter|speed|velocity|acceleration|force|torque|momentum|energy|power|voltage|current|resistance|convert|ratio|probability|derivative|integral)\b/i;
+export function numericIntent(question) {
+  return NUMERIC_RE.test(question);
+}
+
+export const CALC_TOOL = {
+  name: 'calculate',
+  description: 'Evaluate a math expression EXACTLY. Use it for every computation instead of mental arithmetic. ' +
+    'Supports + - * / ^ (power), parentheses, scientific notation (6.02e23), sqrt, cbrt, abs, exp, ln, log (base 10) or log(x, base), ' +
+    'sin/cos/tan (radians; use rad(deg) to convert), asin, acos, atan, round(x, digits), floor, ceil, min, max, pi, e. ' +
+    'Write percentages as decimals (8.25% → 0.0825). % means remainder.',
+  parameters: {
+    type: 'object',
+    properties: { expression: { type: 'string', description: 'e.g. 18500*(0.069/12)/(1-(1+0.069/12)^-60)' } },
+    required: ['expression'],
+  },
+};
 
 export function liveIntent(question) {
   if (WEATHER_RE.test(question)) return 'weather';
@@ -173,7 +193,7 @@ export async function getStockQuote(symbolOrName) {
 
 // Normalises Workers AI tool calls ({name, arguments} with object or JSON-string args).
 export function parseToolCalls(out) {
-  const calls = (out && (out.tool_calls || (out.result && out.result.tool_calls))) || [];
+  const calls = (out && (out.tool_calls || out.result?.tool_calls || out.choices?.[0]?.message?.tool_calls || out.result?.choices?.[0]?.message?.tool_calls)) || [];
   return calls
     .map((c) => {
       const fn = c.function || c;
@@ -181,14 +201,15 @@ export function parseToolCalls(out) {
       if (typeof args === 'string') { try { args = JSON.parse(args); } catch { args = {}; } }
       return { name: fn.name, args: args || {} };
     })
-    .filter((c) => c.name === 'get_weather' || c.name === 'get_stock_quote')
-    .slice(0, 3);
+    .filter((c) => c.name === 'get_weather' || c.name === 'get_stock_quote' || c.name === 'calculate')
+    .slice(0, 6);
 }
 
 export async function runTool(call, where) {
   try {
     if (call.name === 'get_weather') return await getWeather(call.args.location, where);
     if (call.name === 'get_stock_quote') return await getStockQuote(call.args.symbol || call.args.ticker || call.args.company);
+    if (call.name === 'calculate') return evaluate(call.args.expression ?? call.args.expr ?? '');
   } catch (err) {
     return { error: `${call.name} failed: ${err.message}` };
   }
