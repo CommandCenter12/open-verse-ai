@@ -1,0 +1,64 @@
+/* Lock screen: same layout as Command Center (gradient, card, clock, PIN, Touch ID). */
+html.ova-locked body > *:not(#ova-lock) { visibility: hidden; }
+html.ova-locked body { overflow: hidden; }
+
+#ova-lock {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: linear-gradient(160deg, #0f2a5c 0%, #2f5bd3 55%, #4b7bf0 100%);
+  transition: opacity .25s ease, transform .25s ease;
+  font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+#ova-lock[hidden] { display: none; }
+#ova-lock.hide { opacity: 0; transform: scale(1.04); pointer-events: none; }
+
+.ova-card {
+  width: 100%; max-width: 400px; background: #fff; color: #1b1d21;
+  border-radius: 16px; box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
+  padding: 28px 26px; display: flex; flex-direction: column; gap: 14px;
+}
+.ova-brand { display: flex; align-items: center; gap: 12px; }
+.ova-mark {
+  width: 40px; height: 40px; border-radius: 10px; background: #2f5bd3; color: #fff;
+  display: grid; place-items: center; font-weight: 800; letter-spacing: .02em;
+}
+.ova-title { font-size: 20px; font-weight: 700; line-height: 1.2; }
+.ova-sub { font-size: 12px; color: #5d636e; }
+.ova-clock { font-size: 13px; color: #5d636e; display: flex; justify-content: space-between; gap: 8px; }
+.ova-clock .t { color: #2f5bd3; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ova-label { font-size: 13px; font-weight: 600; margin-bottom: -6px; }
+.ova-input {
+  width: 100%; height: 50px; border-radius: 10px; border: 1px solid #e1e2e0; background: #f7f7f5;
+  text-align: center; font-size: 22px; letter-spacing: .4em; padding: 0; color: #1b1d21; box-sizing: border-box;
+}
+.ova-input.text { font-size: 14px; letter-spacing: 0; text-align: left; padding: 0 12px; font-family: ui-monospace, Menlo, monospace; }
+.ova-input:focus { outline: none; border-color: #2f5bd3; box-shadow: 0 0 0 3px #dbe4ff; }
+.ova-btn {
+  height: 46px; border-radius: 10px; background: #2f5bd3; color: #fff;
+  font-weight: 600; font-size: 15px; border: 0; cursor: pointer; margin: 0;
+}
+.ova-btn:disabled { opacity: .6; cursor: progress; }
+.ova-btn.ghost { background: #fff; color: #2f5bd3; border: 1px solid #2f5bd3; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ova-or { position: relative; text-align: center; font-size: 12px; color: #5d636e; }
+.ova-or span { background: #fff; padding: 0 10px; position: relative; }
+.ova-or::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid #e1e2e0; }
+.ova-hint { min-height: 18px; font-size: 13px; text-align: center; color: #5d636e; }
+.ova-hint.err { color: #b3261e; }
+.ova-hint.ok { color: #1f7a4d; }
+.ova-link { background: none; border: 0; color: #5d636e; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 0; margin: 0; align-self: center; }
+.ova-shake { animation: ova-shake .35s; }
+@keyframes ova-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+
+/* Lock / Touch ID controls shown in the page header once unlocked */
+.ova-nav-btn { background: transparent; border: 1px solid var(--border, #e1e2e0); color: var(--muted, #5d636e); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 14px; cursor: pointer; margin: 0; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ova-card { background: #1a1d22; color: #e8e9ec; }
+  :root:not([data-theme="light"]) .ova-or span { background: #1a1d22; }
+  :root:not([data-theme="light"]) .ova-input { background: #111317; border-color: #2c3038; color: #e8e9ec; }
+  :root:not([data-theme="light"]) .ova-btn.ghost { background: #1a1d22; color: #7c9cff; border-color: #7c9cff; }
+  :root:not([data-theme="light"]) .ova-sub, :root:not([data-theme="light"]) .ova-clock, :root:not([data-theme="light"]) .ova-hint, :root:not([data-theme="light"]) .ova-link { color: #9aa1ad; }
+}
+:root[data-theme="dark"] .ova-card { background: #1a1d22; color: #e8e9ec; }
+:root[data-theme="dark"] .ova-or span { background: #1a1d22; }
+:root[data-theme="dark"] .ova-input { background: #111317; border-color: #2c3038; color: #e8e9ec; }

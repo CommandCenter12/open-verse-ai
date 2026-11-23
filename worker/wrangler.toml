@@ -14,9 +14,9 @@ GENERAL_ENABLED = "true"
 AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 GENERAL_PER_DAY = "50"           # per key, per UTC day
 GENERAL_GLOBAL_PER_DAY = "2000"  # all keys combined: caps your Workers AI bill
-# Passkey (Touch ID) sign-in. Origins of pages allowed to use it; each origin's
-# hostname is the WebAuthn RP ID. Passkeys made on one origin only work there.
-PASSKEY_ORIGINS = "https://commandcenter12.github.io,http://localhost:8080"
+# Server-side passkey sign-in (/v1/passkeys/*). Off: the site now uses the local
+# lock screen (site/assets/lock.js) instead. To re-enable, list the page origins here.
+PASSKEY_ORIGINS = ""
 PASSKEY_ATTEMPTS_PER_HOUR = "30"  # per network
 SESSION_HOURS = "12"
 # Owner memory learns from conversations and "remember that …". "false" turns it off.

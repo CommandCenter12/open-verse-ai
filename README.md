@@ -135,17 +135,16 @@ Weather and market-price questions skip the docs. Llama picks a tool (`get_weath
 
 Facts go into every owner prompt (≈1,800 chars, newest first). Answered owner questions are saved (redacted) as searchable conversations (`source = 'openverse'`, newest 5,000 kept). Not saved: live data, math, questions about past conversations, "I don't know" answers (they would make memory quote itself). `memory:upload` replaces imported data but keeps facts and learned conversations. Off switch: `MEMORY_LEARN = "false"` or `"use_memory": false` per request.
 
-## Touch ID sign-in (passkeys)
+## Lock screen (PIN + Touch ID)
 
-The portal's **Owner sign-in** box lets you use Touch ID, Face ID, Windows Hello or a security key instead of pasting the owner key.
+Every page of the site is behind a lock screen like Command Center's.
 
-1. Once per device: open the portal → **Set up Touch ID on this device** → paste the owner key → **Register this device**.
-2. Afterwards: **Sign in with Touch ID**. You get a 12-hour session token (`ovs_…`) that acts as the owner key for asks, memory and usage.
-
-- Verification uses [`@simplewebauthn/server`](https://github.com/MasterKale/SimpleWebAuthn) (pinned). Every sign-in requires user verification (fingerprint/face), single-use challenges (5 min), origin and RP ID checks, and signature-counter checks.
-- A session **cannot** add or remove passkeys or revoke the owner key. Those need the owner key itself, so a stolen session can't make itself permanent.
-- Deleting a passkey or revoking the owner key ends its sessions immediately. Only token hashes are stored.
-- Passkeys are bound to the page's hostname (`PASSKEY_ORIGINS`), so one made on `localhost` won't work on GitHub Pages and vice versa. Synced passkeys (iCloud Keychain) work on your other Apple devices.
+- **First time on a device:** paste your owner key and choose an 8-digit PIN. The key is encrypted with AES-GCM using a key from your PIN (PBKDF2-SHA256, 600,000 rounds) and stored **only in that browser** (`localStorage`). It is never published, so the PIN can't be brute-forced from the internet.
+- **Unlock:** PIN, or Touch ID / Face ID after tapping **Enable Touch ID** (two taps). Touch ID uses the passkey PRF secret to decrypt the key; browsers without PRF fall back to a non-extractable key kept in that browser.
+- After 5 wrong PINs the screen waits 30 s, doubling up to 1 h. It auto-locks after 5 minutes idle; the unlocked key lives only in that tab.
+- **Forget this device** wipes the saved key and Touch ID from the browser.
+- The page HTML itself is public in this repo; what the lock protects is your owner key, and the API keys protect your data.
+- The older server-side passkey sign-in (`/v1/passkeys/*`) is switched off (`PASSKEY_ORIGINS = ""`).
 
 ## Security model
 
