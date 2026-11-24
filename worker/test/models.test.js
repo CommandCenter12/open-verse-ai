@@ -112,3 +112,24 @@ test('a model that repeats a calculation or goes quiet gets one final call witho
   assert.equal(r2.calculations.length, 1); // the repeat (written with **) was recognised
   assert.equal(r2.answer, '1.5');
 });
+
+test('Gemma gets reasoning_effort low; other models are unchanged', async () => {
+  const seen = [];
+  const AI = { run: async (model, input) => { seen.push([model, input.reasoning_effort]); return { choices: [{ message: { content: 'Paris.' } }] }; } };
+  await ask(AI, 'What is the capital of France?', {});
+  await resolveAsk({ index: INDEX, question: 'What is the capital of France?', topK: 3, sourcesOnly: false, model: 'gemma', log: { error() {} }, env: { REPO_URL: 'x', AI }, reserveGeneral: async () => ({ ok: true }) });
+  assert.deepEqual(seen, [['@cf/qwen/qwen3.8-27b', undefined], ['@cf/google/gemma-4-26b-a4b-it', 'low']]);
+});
+
+test('daily Workers AI limit (4006) → clear message, stops after the first model', async () => {
+  const models = [];
+  const AI = { run: async (model) => { models.push(model); throw new Error('4006: you have used up your daily free allocation of 10,000 neurons'); } };
+  const r = await ask(AI, 'What is the capital of France?');
+  assert.equal(models.length, 1); // account-wide limit: no point trying the backups
+  assert.equal(r.answered, false);
+  assert.equal(r.general_unavailable, 'ai_daily_limit');
+  assert.match(r.message, /free AI allowance[\s\S]*resets at 00:00 UTC/);
+  assert.match(r.ai_resets_at, /T00:00:00\.000Z$/);
+  const plus = await resolveAsk({ index: INDEX, question: 'What is the capital of France?', topK: 3, sourcesOnly: false, model: 'plus', log: { error() {} }, env: { REPO_URL: 'x', AI }, reserveGeneral: async () => ({ ok: true }) });
+  assert.equal(plus.general_unavailable, 'ai_daily_limit');
+});

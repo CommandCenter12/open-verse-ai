@@ -16,6 +16,12 @@ For owner keys, Open Verse Ai learns. Saying "remember that ..." or "from now on
 ## Models
 General answers use open-weight models on Cloudflare Workers AI. By default (model auto) Qwen 3.8 27B from Alibaba answers first; if it fails, Gemma 4 26B from Google and then Llama 4 Scout from Meta take over, at most three models per question, and the response says which model answered. Send model set to qwen, gemma, llama4, llama (Llama 3.3 70B) or mistral (Mistral Small 3.1) to choose one; it goes first and the others remain fallbacks. GET /v1/models lists them. For questions with numbers, the model uses a calculate tool so every number is computed exactly by the Open Verse Ai calculator, and the response lists those calculations.
 
+## Open Source+
+Open Source+ is a combined model mode, chosen by sending model set to plus. Qwen 3.8 from Alibaba, Llama 4 Scout from Meta and Gemma 4 from Google answer the same question at the same time, each with the exact calculator. A combine step then merges their answers into one: where they agree it states the shared answer, and where they disagree it uses the calculator results to decide which is right. The response lists the contributors, each model's own answer and every calculation. It uses about four times the AI usage of a normal answer and is slower, so it is an option rather than the default.
+
+## Saved chats
+The chat page saves conversations for owner keys. Chats can be pinned, renamed, moved into folders such as Math, and deleted. When a question is sent with a chat_id, the chat's recent messages are given to the model so follow-up questions work, and, when memory is on, recent work from other chats in the same folder is used as background.
+
 ## Reading level
 By default every answer is written for a 9th-grade reader: everyday words, short sentences and short explanations of technical terms, while keeping every fact, number, unit, formula and step. Answers from the docs are rewritten by a model and checked so that every number in the original still appears; if any number is missing, the original wording is returned instead and simplify_skipped says why. The original wording is always included as original_answer. Send style set to original to get the unchanged wording.
 

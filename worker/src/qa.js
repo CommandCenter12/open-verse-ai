@@ -2,6 +2,7 @@
 // It never generates text that isn't in the knowledge base.
 import { tokenize } from './tokenize.js';
 import { HttpError } from './http.js';
+import TRADING_INDEX from './knowledge-trading-index.json';
 
 // Words that name the project: present in many API chunks, so they make any question
 // "about Open Verse Ai" look covered. Ignored by the weighted-coverage check.
@@ -47,7 +48,7 @@ export function validateQuestion(body) {
   }
   let model = 'auto';
   if (body.model !== undefined) {
-    const ok = ['auto', 'qwen', 'gemma', 'llama4', 'llama', 'mistral'];
+    const ok = ['auto', 'plus', 'qwen', 'gemma', 'llama4', 'llama', 'mistral'];
     if (typeof body.model !== 'string' || !ok.includes(body.model)) {
       throw new HttpError(400, 'invalid_model', `"model" must be one of: ${ok.join(', ')}.`);
     }
@@ -123,7 +124,27 @@ function sourceUrl(repoUrl, chunk) {
   return `${repoUrl.replace(/\/$/, '')}/blob/main/knowledge/${chunk.file}#${chunk.anchor}`;
 }
 
-export function answer(index, question, topK, repoUrl) {
+// Imported trading-skill write-ups (knowledge/trading-*.md) live in their own index and are
+// searched only when the core docs have no answer and the question is clearly about trading.
+const TRADING_TERMS = new Set(tokenize(
+  'stock stocks share shares trade trades trading trader swing screener screen scan breakout pullback dip reversal ' +
+  'rsi macd vwap atr sma ema moving average support resistance stop loss position sizing size risk reward ' +
+  'portfolio rebalance dividend earnings eps insider form 13f congress pelosi backtest backtesting strategy edge ' +
+  'vcp canslim minervini oneil stockbee momentum breadth uptrend downtrend market regime bubble ftd follow through ' +
+  'distribution pead cot futures options covered call put drawdown circuit breaker halal sector etf spy qqq ' +
+  'watchlist alert alerts broker order orders limit bracket paper alpaca tax lot wash harvest copycat'
+));
+export function tradingIntent(terms) { return terms.some((t) => TRADING_TERMS.has(t)); }
+
+export function answer(index, question, topK, repoUrl, tradingIndex = TRADING_INDEX) {
+  const core = answerWith(index, question, topK, repoUrl);
+  if (core.answered || !tradingIndex || !tradingIndex.N) return core;
+  if (!tradingIntent(tokenize(question))) return core;
+  const t = answerWith(tradingIndex, question, topK, repoUrl);
+  return t.answered ? t : { ...core, nearest_topics: [...core.nearest_topics, ...t.nearest_topics].slice(0, topK) };
+}
+
+function answerWith(index, question, topK, repoUrl) {
   const terms = tokenize(question);
   if (terms.length === 0) {
     throw new HttpError(400, 'no_searchable_terms', 'Question has no searchable words. Ask about a specific topic.');

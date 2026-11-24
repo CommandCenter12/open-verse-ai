@@ -83,7 +83,7 @@
           math: 'Calculated',
           live: 'Live data (' + (r.live_data || []).map((d) => d.source).filter(Boolean).join(', ') + ')',
           memory: 'Memory',
-          general: 'AI answer (' + r.model + ')' + (r.calculations ? ', numbers computed exactly' : '') + ', not from the docs',
+          general: 'AI answer (' + (r.model === 'plus' ? 'Open Source+: ' + (r.contributors || []).map((c) => c.model.split('-')[0] + (c.ok ? ' ✓' : ' ✗')).join(', ') : r.model) + ')' + (r.calculations ? ', numbers computed exactly' : '') + ', not from the docs',
         }[r.mode] || r.mode;
         const by = r.fallback_from ? ' · ' + r.fallback_from + ' was unavailable, answered by ' + r.model : '';
         $('confidence').textContent = label + ' · confidence: ' + r.confidence + (r.learned ? ' · saved to memory' : '') + by;

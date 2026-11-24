@@ -19,6 +19,21 @@ export const MODELS = {
   mistral: { id: '@cf/mistralai/mistral-small-3.1-24b-instruct', name: 'Mistral Small 3.1 24B', maker: 'Mistral AI', note: 'Fast, but made a physics mistake in our tests; last resort' },
 };
 export const MODEL_ORDER = ['qwen', 'gemma', 'llama4', 'llama', 'mistral'];
+// Per-model request settings. Gemma otherwise spends its whole token budget on hidden
+// reasoning and returns no answer (finish_reason "length"); "low" keeps a short think.
+const MODEL_PARAMS = { [MODELS.gemma.id]: { reasoning_effort: 'low' } };
+
+// "Open Source+": Qwen (Alibaba) + Llama 4 (Meta) + Gemma (Google) answer in parallel, then one
+// combine step merges them into a single answer and settles disagreements with the calculator.
+export const PLUS = { key: 'plus', name: 'Open Source+', members: ['qwen', 'llama4', 'gemma'],
+  note: 'Qwen + Llama 4 + Gemma answer together, then their answers are combined and checked. About 4× the AI usage, slower.' };
+const COMBINE_PROMPT = [
+  'You are Open Source+, which combines answers from three open-weight AI models (Qwen by Alibaba, Llama by Meta, Gemma by Google) into ONE best answer.',
+  'Read the question and the candidate answers. Where they agree, state the shared answer. Where they disagree, decide which is correct using the',
+  'CALCULATOR RESULTS (exact) and careful reasoning, and fix any mistakes; never average wrong answers.',
+  'Use only facts supported by the candidates or the calculator; do not add new facts. Keep every correct detail, number and step.',
+  'End with one short line starting "Models:" saying whether the models agreed or which one was corrected.',
+].join(' ');
 const MAX_MODELS_TRIED = 3;
 const TIMEOUT_MS = 45000;
 const MAX_TOOL_ROUNDS = 3;
@@ -111,7 +126,7 @@ export function memoryBlock(memory) {
     }
   }
   memory.chunks.forEach((c, i) => {
-    const kind = { claude: 'Claude chat', gemini: 'Gemini chat', drive: 'Drive file', gmail: 'sent email', keep: 'Keep note', calendar: 'calendar', openverse: 'earlier Open Verse Ai conversation' }[c.source] || c.source;
+    const kind = { claude: 'Claude chat', gemini: 'Gemini chat', drive: 'Drive file', gmail: 'sent email', keep: 'Keep note', calendar: 'calendar', openverse: 'earlier Open Verse Ai conversation', folder: 'chat in the same folder' }[c.source] || c.source;
     parts.push(`MEMORY [M${i + 1}] (${kind}, ${c.date || 'undated'}, "${c.title}"):`, c.text);
   });
   parts.push('</background>');
@@ -122,10 +137,11 @@ export function memoryBlock(memory) {
   return parts.join('\n');
 }
 
-async function runModel(env, model, input) {
+async function runModel(env, model, input, timeoutMs = TIMEOUT_MS) {
+  input = { ...input, ...(MODEL_PARAMS[model] || {}) };
   let timer;
   const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('Workers AI timed out')), TIMEOUT_MS);
+    timer = setTimeout(() => reject(new Error('Workers AI timed out')), timeoutMs);
   });
   try {
     return await Promise.race([env.AI.run(model, input), timeout]);
@@ -179,6 +195,15 @@ function liveBlock(results) {
   ].join('\n');
 }
 
+// Workers AI free plan: 10,000 neurons/day, error 4006 once used up (resets 00:00 UTC).
+const DAILY_LIMIT_RE = /\b4006\b|daily free allocation/i;
+export function aiLimitError(reasons) {
+  const e = new Error('Workers AI daily allowance used up');
+  e.code = 'ai_daily_limit';
+  e.reasons = reasons;
+  return e;
+}
+
 // Returns a response object for /v1/ask, or throws on AI failure/timeout.
 // opts.where: caller's approximate location (request.cf) for "what's the weather" with no city.
 // opts.model: 'auto' (default) or a key of MODELS. The chosen model goes first; the rest of
@@ -195,6 +220,7 @@ export function modelChain(env, choice) {
 }
 
 export async function generalAnswer(env, question, memory = null, opts = {}) {
+  if (opts.model === PLUS.key) return openSourcePlus(env, question, memory, opts);
   const chain = modelChain(env, opts.model);
   const failures = [];
   for (const model of chain) {
@@ -204,9 +230,12 @@ export async function generalAnswer(env, question, memory = null, opts = {}) {
         ? { ...r, fallback_from: failures[0].model, fallback_reason: failures.map((f) => `${f.model}: ${f.reason}`).join('; ').slice(0, 200) }
         : r;
     } catch (err) {
-      failures.push({ model: modelLabel(model), reason: String((err && err.message) || err).slice(0, 80) });
+      const reason = String((err && err.message) || err).slice(0, 120);
+      failures.push({ model: modelLabel(model), reason });
+      if (DAILY_LIMIT_RE.test(reason)) break; // the limit is account-wide: other models will fail too
     }
   }
+  if (failures.every((f) => DAILY_LIMIT_RE.test(f.reason))) throw aiLimitError(failures);
   throw new Error(`all models failed (${failures.map((f) => f.model).join(', ')})`);
 }
 
@@ -233,9 +262,10 @@ async function answerWith(env, model, question, memory, opts) {
       ? '\nAll needed tool results are above. Now write the final answer for the user in plain text. Do not call any tools.'
       : '';
     const out = await runModel(env, model, {
-      messages: [{ role: 'system', content: system + (live.length ? liveBlock(live) : '') + calcBlock(calcs) + finalNote }, { role: 'user', content: question }],
+      messages: [{ role: 'system', content: system + (live.length ? liveBlock(live) : '') + calcBlock(calcs) + finalNote }, ...(opts.history || []), { role: 'user', content: question }],
       ...(canCall ? { tools } : {}),
-      max_tokens: 700,
+      // Room for models that reason privately before answering (Qwen, Gemma), or they return nothing.
+      max_tokens: 1500,
       temperature: 0.1,
     });
     let calls = canCall ? parseToolCalls(out).filter((c) => tools.some((t) => t.name === c.name)) : [];
@@ -247,7 +277,7 @@ async function answerWith(env, model, question, memory, opts) {
     if (!calls.length) {
       answer = textOf(out);
       // Some models (e.g. Gemma) return no text while tools are still on offer: ask once more without tools.
-      if (!answer && canCall && (calcs.length || live.length)) { toolsDone = true; continue; }
+      if (!answer && canCall) { toolsDone = true; continue; }
       break;
     }
     const results = await Promise.all(calls.map(async (c) => ({ tool: c.name, args: c.args, result: await runTool(c, opts.where) })));
@@ -297,5 +327,63 @@ async function answerWith(env, model, question, memory, opts) {
           })),
         }
       : {}),
+  };
+}
+
+// ---------- Open Source+ ----------
+async function openSourcePlus(env, question, memory, opts) {
+  const members = PLUS.members.map((k) => MODELS[k].id);
+  const settled = await Promise.allSettled(members.map((m) => answerWith(env, m, question, memory, opts)));
+  const ok = [];
+  const contributors = settled.map((s, i) => {
+    const label = modelLabel(members[i]);
+    if (s.status === 'fulfilled') { ok.push(s.value); return { model: label, ok: true }; }
+    return { model: label, ok: false, error: String((s.reason && s.reason.message) || s.reason).slice(0, 100) };
+  });
+  if (!ok.length) {
+    if (contributors.every((c) => DAILY_LIMIT_RE.test(c.error || ''))) throw aiLimitError(contributors);
+    throw new Error('Open Source+: all three models failed');
+  }
+  // Every exact calculation any model made, without duplicates.
+  const seen = new Set();
+  const calcs = ok.flatMap((r) => r.calculations || []).filter((c) => { const k = c.expression.replace(/\s+/g, ''); if (seen.has(k)) return false; seen.add(k); return true; });
+  const live = ok.flatMap((r) => r.live_data || []);
+  const base = ok[0];
+  if (ok.length === 1) {
+    return { ...base, model: PLUS.key, contributors, ...(calcs.length ? { calculations: calcs } : {}),
+      note: `Open Source+: only ${modelLabel(members[settled.findIndex((s) => s.status === 'fulfilled')])} answered (the others failed), so this is a single-model answer. ${base.note || ''}`.trim() };
+  }
+  // Trim long candidates so the merge stays fast (three full worked solutions can time out).
+  const candidates = ok.map((r, i) => `ANSWER ${i + 1} (${r.model}):\n${r.answer.length > 1200 ? r.answer.slice(0, 1200) + ' …' : r.answer}`).join('\n\n');
+  const combineSystem = [COMBINE_PROMPT, opts.styleOverride ? opts.styleOverride : READING_LEVEL, calcBlock(calcs), live.length ? liveBlock(live.map((d) => ({ tool: d.tool, result: d.data || { error: d.error } }))) : ''].join('\n');
+  let combined = '';
+  let combiner = null;
+  const combineErrors = [];
+  // Merging is reading + editing, not hard reasoning: Llama 4 first (fast, no hidden thinking), then Qwen.
+  for (const m of [MODELS.llama4.id, MODELS.qwen.id]) {
+    try {
+      const out = await runModel(env, m, {
+        messages: [{ role: 'system', content: combineSystem }, { role: 'user', content: `QUESTION: ${question}\n\n${candidates}` }],
+        max_tokens: 900, temperature: 0.1,
+      }, 60000);
+      combined = textOf(out).slice(0, MAX_ANSWER_CHARS);
+      if (combined) { combiner = modelLabel(m); break; }
+      combineErrors.push(`${modelLabel(m)}: empty`);
+    } catch (err) { combineErrors.push(`${modelLabel(m)}: ${String((err && err.message) || err).slice(0, 60)}`); }
+  }
+  if (!combined) combined = base.answer; // combine step failed: fall back to the first answer
+  const liveOk = live.some((d) => !d.error);
+  return {
+    ...base,
+    answer: combined,
+    model: PLUS.key,
+    combined_by: combiner,
+    ...(combineErrors.length ? { combine_errors: combineErrors } : {}),
+    contributors,
+    candidates: ok.map((r) => ({ model: r.model, answer: r.answer })),
+    ...(calcs.length ? { calculations: calcs } : {}),
+    ...(live.length ? { live_data: live } : {}),
+    confidence: liveOk ? 'live-data' : calcs.some((c) => !c.error) ? 'calculated' : 'unverified',
+    note: `Open Source+ combined answers from ${ok.map((r) => r.model).join(', ')}${combiner ? ` (merged by ${combiner})` : ' (merge step failed; showing one model\'s answer)'}. AI answers can still be wrong; numbers were computed exactly.`,
   };
 }

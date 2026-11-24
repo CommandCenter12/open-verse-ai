@@ -119,6 +119,16 @@ On owner requests that fall through to Llama, the profile and the top 3 matching
 
 Limits: redaction is pattern-based (emails, phones, card numbers, keys/tokens, passwords), so review the chunks; names and street addresses inside text are not removed. Retrieval is keyword-based (FTS5 with stemming), so it can miss paraphrases. Retrieved chunks are sent to Workers AI.
 
+## Chat page (`site/chat.html`)
+
+Claude/ChatGPT-style chat behind the lock screen: collapsible sidebar with **New chat**, **Pinned**, **Folders** (create, rename, delete; "+" starts a chat inside a folder) and **Recent** (Today / Yesterday / Previous 7 Days …); per-chat menu to pin, rename, move to a folder (or a new one) and delete. Messages render as markdown with highlighted, copyable code and KaTeX math (libraries pinned + SRI, output sanitized with DOMPurify). Each answer shows the model (and any backup), "numbers computed exactly", sources, calculations, memory used and "Show original wording". Bottom bar: auto-growing input (Enter sends, Shift+Enter new line), model menu, "Use past chats as memory".
+
+Chats live in D1 (`migrations/0005_chats.sql`) and are owner-only. `/v1/ask` with `chat_id` sends the chat's last 8 messages to the model (follow-ups work) and saves the exchange; with memory on, recent Q&A from other chats in the **same folder** is added as background.
+
+## Open Source+ (`"model": "plus"`)
+
+Qwen 3.8 (Alibaba) + Llama 4 Scout (Meta) + Gemma 4 (Google) answer in parallel with the calculator; Llama 4 (then Qwen) merges them, settling disagreements with the exact calculator results. Returns `contributors`, `candidates`, `calculations`, `combined_by`. Falls back to a single answer if only one model succeeds or the merge fails. ~4× AI usage, ~30–60 s. Gemma runs with `reasoning_effort: "low"` (otherwise it spends its whole token budget thinking and returns nothing).
+
 ## Models and exact math
 
 | `model` | Model (open weights) | In our tests |

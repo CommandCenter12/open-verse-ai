@@ -22,7 +22,7 @@ function notAnswered(question, extra = {}) {
 
 // reserveGeneral(): Promise<{ ok: true } | { ok: false, reason: string }> – consumes general quota.
 // loadMemory(): Promise<{ profile, chunks }> – owner keys only; null for everyone else.
-export async function resolveAsk({ index, question, topK, sourcesOnly, env, reserveGeneral, loadMemory = null, where = null, model = 'auto', style = 'simple', log = console }) {
+export async function resolveAsk({ index, question, topK, sourcesOnly, env, reserveGeneral, loadMemory = null, where = null, model = 'auto', style = 'simple', history = [], log = console }) {
   const math = tryMath(question);
   if (math) {
     if (math.error) {
@@ -69,9 +69,19 @@ export async function resolveAsk({ index, question, topK, sourcesOnly, env, rese
   const memory = loadMemory ? await loadMemory() : null;
   try {
     const extra = style === 'original' ? { styleOverride: 'Write in your normal style.' } : {};
-    return { ...(await generalAnswer(env, question, memory, { where, model, ...extra })), style, nearest_topics: docs.nearest_topics };
+    return { ...(await generalAnswer(env, question, memory, { where, model, history, ...extra })), style, nearest_topics: docs.nearest_topics };
   } catch (err) {
     log.error('general answer failed', err && err.message);
+    if (err && err.code === 'ai_daily_limit') {
+      const next = new Date(); next.setUTCHours(24, 0, 0, 0);
+      return {
+        ...docs,
+        general_unavailable: 'ai_daily_limit',
+        ai_resets_at: next.toISOString(),
+        message: "Today's free AI allowance (Cloudflare Workers AI) is used up, so AI answers are paused until it resets at 00:00 UTC. " +
+          'Answers from the docs and plain math (like 12*12) still work.',
+      };
+    }
     return { ...docs, general_unavailable: 'error' };
   }
 }

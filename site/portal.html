@@ -11,7 +11,7 @@
 <script src="assets/config.js"></script>
 </head>
 <body>
-<header class="nav"><div class="wrap"><a class="brand" href="index.html">Open Verse Ai</a><a href="index.html">Home</a><a href="docs.html">Docs</a><a href="portal.html" aria-current="page">API keys</a><a href="https://github.com/">GitHub</a></div></header>
+<header class="nav"><div class="wrap"><a class="brand" href="index.html">Open Verse Ai</a><a href="chat.html">Chat</a><a href="index.html">Home</a><a href="docs.html">Docs</a><a href="portal.html" aria-current="page">API keys</a><a href="https://github.com/">GitHub</a></div></header>
 <main><div class="wrap">
   <h1>API keys</h1>
   <p class="lead">Ask Open Verse Ai anything. You're unlocked with your owner key, so answers use your memory and it learns from what you ask.</p>
@@ -26,6 +26,7 @@
     <label for="model">Model</label>
     <select id="model" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font:inherit">
       <option value="auto">Auto: best available (Qwen, then backups)</option>
+      <option value="plus">Open Source+: Qwen + Llama + Gemma combined (slower)</option>
       <option value="qwen">Qwen 3.8 27B (Alibaba): math &amp; reasoning</option>
       <option value="gemma">Gemma 4 26B (Google)</option>
       <option value="llama4">Llama 4 Scout 17B (Meta)</option>

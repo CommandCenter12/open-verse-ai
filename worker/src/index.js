@@ -4,8 +4,9 @@ import { createKey, authenticate, touchKey, revokeKey, sha256Hex } from './keys.
 import { enforceAsk, usage, hit, intVar, windows, cleanup, reserveGeneral } from './ratelimit.js';
 import { validateQuestion } from './qa.js';
 import { resolveAsk } from './ask.js';
-import { aiConfigured, DEFAULT_MODEL, MODELS, MODEL_ORDER, modelChain } from './general.js';
+import { aiConfigured, DEFAULT_MODEL, MODELS, MODEL_ORDER, modelChain, PLUS } from './general.js';
 import { loadMemory } from './memory.js';
+import { handleChats, chatHistory, saveExchange, folderMemory } from './chats.js';
 import { parseCommand, handleCommand, shouldLearn, saveConversation, pruneLearned, LEARNED_SOURCE } from './learn.js';
 import {
   passkeyContext, limitPasskeyAttempts, registrationOptions, registerPasskey,
@@ -41,6 +42,7 @@ async function route(request, env, ctx) {
       default: 'auto',
       auto_order: modelChain(env, 'auto'),
       models: MODEL_ORDER.map((k) => ({ key: k, ...MODELS[k] })),
+      combined: { key: PLUS.key, name: PLUS.name, members: PLUS.members, note: PLUS.note },
     });
   }
 
@@ -99,12 +101,25 @@ async function route(request, env, ctx) {
     const row = await authenticate(request, env.DB);
     const body = await readJson(request); // validate before spending quota
     const { question, topK, sourcesOnly, useMemory, model, style } = validateQuestion(body);
+    // Optional saved chat (owner only): its recent messages give the model context, and the
+    // exchange is saved back to it.
+    let chat = null;
+    let history = [];
+    if (body.chat_id !== undefined) {
+      if (row.scope !== 'owner') throw new HttpError(403, 'owner_only', 'Saved chats need an owner key.');
+      if (typeof body.chat_id !== 'string') throw new HttpError(400, 'invalid_chat_id', '"chat_id" must be a string.');
+      ({ chat, history } = await chatHistory(env.DB, body.chat_id));
+    }
     const rl = await enforceAsk(env.DB, row.key_hash, env);
     ctx.waitUntil(touchKey(env.DB, row.id));
     const learning = row.scope === 'owner' && useMemory && env.MEMORY_LEARN !== 'false';
+    const finish = async (result) => {
+      if (chat) { await saveExchange(env.DB, chat, question, result, history.length === 0); result.chat_id = chat.id; }
+      return json(result, 200, rl);
+    };
     if (learning) {
       const cmd = parseCommand(question);
-      if (cmd) return json(await handleCommand(env.DB, cmd, question), 200, rl);
+      if (cmd) return finish(await handleCommand(env.DB, cmd, question));
     }
     const result = await resolveAsk({
       index: INDEX,
@@ -116,7 +131,14 @@ async function route(request, env, ctx) {
       model,
       style,
       // Personal memory is only ever read for owner keys.
-      loadMemory: row.scope === 'owner' && useMemory ? () => loadMemory(env.DB, question) : null,
+      loadMemory: row.scope === 'owner' && useMemory
+        ? async () => {
+            const m = await loadMemory(env.DB, question);
+            const folder = await folderMemory(env.DB, chat).catch(() => []);
+            return { ...m, chunks: [...folder, ...m.chunks].slice(0, 5) };
+          }
+        : null,
+      history,
       // Approximate location of the caller (from Cloudflare), only for "weather" with no city.
       where: request.cf && request.cf.latitude ? { latitude: request.cf.latitude, longitude: request.cf.longitude, city: request.cf.city, country: request.cf.country } : null,
     });
@@ -124,7 +146,15 @@ async function route(request, env, ctx) {
       ctx.waitUntil(saveConversation(env.DB, question, result).catch((e) => console.error('learn failed', e.message)));
       result.learned = true;
     }
-    return json(result, 200, rl);
+    return finish(result);
+  }
+
+  // Owner-only: saved chats and folders for the chat page.
+  if (path === '/v1/chats' || path.startsWith('/v1/chats/') || path === '/v1/folders' || path.startsWith('/v1/folders/')) {
+    const row = await authenticate(request, env.DB);
+    if (row.scope !== 'owner') throw new HttpError(403, 'owner_only', 'Saved chats need an owner key.');
+    const [status, body] = await handleChats(request, env, path, method, readJson);
+    return json(body, status);
   }
 
   // Owner-only: saved facts.
