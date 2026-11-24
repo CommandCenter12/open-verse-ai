@@ -10,3 +10,4 @@ worker/src/knowledge-index.json
 
 # Personal chat exports, parsed memory, owner key output. Never commit.
 private/
+worker/src/knowledge-trading-index.json

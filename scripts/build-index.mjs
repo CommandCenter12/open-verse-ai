@@ -26,7 +26,25 @@ function anchor(h) {
   return h.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
 }
 
-const files = (await readdir(dir)).filter((f) => f.endsWith('.md')).sort();
+// knowledge/trading-*.md (imported trading skills) go into their own index, so their size and
+// vocabulary can't change how the core docs score. qa.js searches it only for trading questions.
+const all = (await readdir(dir)).filter((f) => f.endsWith('.md')).sort();
+const isTrading = (f) => f.startsWith('trading-');
+const outTrading = join(root, 'worker', 'src', 'knowledge-trading-index.json');
+const { chunks: tChunks } = await chunkFiles(all.filter(isTrading));
+await writeFile(outTrading, JSON.stringify(indexOf(tChunks)));
+console.log(`trading index: ${tChunks.length} chunks from ${all.filter(isTrading).length} files -> ${outTrading}`);
+const files = all.filter((f) => !isTrading(f));
+const { chunks } = await chunkFiles(files);
+
+function indexOf(cs) {
+  const df = {};
+  for (const c of cs) for (const t of Object.keys(c.tf)) df[t] = (df[t] || 0) + 1;
+  const avgdl = cs.reduce((s, c) => s + c.len, 0) / Math.max(1, cs.length);
+  return { version: 1, builtAt: new Date().toISOString(), N: cs.length, avgdl, df, chunks: cs };
+}
+
+async function chunkFiles(files) {
 const chunks = [];
 for (const file of files) {
   const { meta, body } = frontMatter(await readFile(join(dir, file), 'utf8'));
@@ -65,10 +83,9 @@ for (const file of files) {
   }
   flush();
 }
+return { chunks };
+}
 
-const df = {};
-for (const c of chunks) for (const t of Object.keys(c.tf)) df[t] = (df[t] || 0) + 1;
-const avgdl = chunks.reduce((s, c) => s + c.len, 0) / Math.max(1, chunks.length);
-const index = { version: 1, builtAt: new Date().toISOString(), N: chunks.length, avgdl, df, chunks };
+const index = indexOf(chunks);
 await writeFile(out, JSON.stringify(index));
 console.log(`knowledge index: ${chunks.length} chunks from ${files.length} files -> ${out}`);
