@@ -431,6 +431,11 @@
   // ---------- start once unlocked ----------
   setEmpty(true);
   addEventListener('load', () => {
-    window.OVA.onUnlock(() => { loadList().catch((err) => $('#side-list').replaceChildren(el('div', { class: 'empty-note', text: err.message }))); input.focus(); });
+    window.OVA.onUnlock(() => {
+      loadList().catch((err) => $('#side-list').replaceChildren(el('div', { class: 'empty-note', text: err.message })));
+      // chat.html?chat=<id> opens that chat (used by the Chrome extension's "Continue in chat").
+      const wanted = new URLSearchParams(location.search).get('chat');
+      if (wanted && /^[a-f0-9]{16}$/.test(wanted)) openChat(wanted); else input.focus();
+    });
   });
 })();

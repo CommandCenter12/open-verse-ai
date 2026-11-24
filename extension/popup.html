@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Open Verse Ai</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="mark">OV</span><span>Open Verse Ai</span></div>
+    <button class="ghost small" id="lock" hidden title="Lock">Lock</button>
+  </header>
+
+  <!-- First run: save the owner key, encrypted with a PIN -->
+  <section id="setup" hidden>
+    <p class="muted">Paste your owner key once. It's encrypted with your PIN and stays in this extension only.</p>
+    <label for="key">Owner key</label>
+    <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="ova_…">
+    <label for="pin1">Choose an 8-digit PIN</label>
+    <input id="pin1" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off">
+    <label for="pin2">Repeat PIN</label>
+    <input id="pin2" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off">
+    <button id="save">Encrypt and save</button>
+  </section>
+
+  <!-- Locked -->
+  <section id="locked" hidden>
+    <label for="pin">Enter your 8-digit PIN</label>
+    <input id="pin" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off">
+    <button id="unlock">Unlock</button>
+    <button class="link" id="forget">Forget saved key</button>
+  </section>
+
+  <!-- Ask about this page -->
+  <section id="main" hidden>
+    <div class="page" id="page"><span class="dot"></span><span id="page-title">This page</span></div>
+    <div class="quick">
+      <button class="chip" data-q="Summarize this page in simple words.">Summarize</button>
+      <button class="chip" data-q="Explain the main idea of this page simply, like I'm in 9th grade.">Explain simply</button>
+      <button class="chip" data-q="Make a study guide from this page: key terms, main ideas, and 5 practice questions.">Study guide</button>
+    </div>
+    <div class="box">
+      <textarea id="question" rows="3" placeholder="Ask about this page…"></textarea>
+      <div class="row">
+        <label class="toggle" title="Send this page's text (or the text you highlighted)"><input type="checkbox" id="use-page" checked> Use this page</label>
+        <button class="pill" id="think" aria-pressed="false" title="Qwen + Llama + Gemma work together (slower)">Think</button>
+        <button id="ask" class="send" aria-label="Ask">↑</button>
+      </div>
+    </div>
+    <label class="toggle small-print"><input type="checkbox" id="save-chat" checked> Save in my chats</label>
+    <div id="answer" class="answer" hidden></div>
+  </section>
+
+  <p class="status" id="status" role="status"></p>
+  <script src="popup.js"></script>
+</body>
+</html>
