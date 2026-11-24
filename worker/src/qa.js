@@ -12,7 +12,8 @@ const PROJECT_TERMS = new Set(tokenize('open verse ai api v1'));
 const WEAK_TERMS = new Set(tokenize(
   'calculate calculated calculation compute computed work works working use used using happen happens mean means ' +
   'find get make need explain example formula difference between best good quickly quick easy simple step steps way ways ' +
-  'value values number numbers typical usually exactly correct right determine figure choose pick many much'
+  'value values number numbers typical usually exactly correct right determine figure choose pick many much ' +
+  'times plus minus divided multiplied squared cubed equals add subtract multiply divide'
 ));
 
 const K1 = 1.2;
@@ -23,6 +24,9 @@ export const MIN_COVERAGE = 0.5; // share of distinct query terms the best chunk
 // Stops "Does X have a /v1/translate endpoint?" matching on the common words while the
 // one word that matters ("translate") appears nowhere.
 export const MIN_WEIGHTED_COVERAGE = 0.55; // > half: a borderline half-match (e.g. 'square root' in Volatility) is not an answer
+
+export const MAX_ATTACHMENTS = 5;
+export const MAX_ATTACHMENT_CHARS = 40000;
 
 export function validateQuestion(body) {
   const q = body.question;
@@ -66,7 +70,25 @@ export function validateQuestion(body) {
     }
     useMemory = body.use_memory;
   }
-  return { question, topK, sourcesOnly, useMemory, model, style };
+  // Files the user attached (text already extracted in the browser). Data only, never instructions.
+  let attachments = [];
+  if (body.attachments !== undefined) {
+    if (!Array.isArray(body.attachments) || body.attachments.length > MAX_ATTACHMENTS) {
+      throw new HttpError(400, 'invalid_attachments', `"attachments" must be a list of at most ${MAX_ATTACHMENTS} files.`);
+    }
+    let total = 0;
+    attachments = body.attachments.map((a) => {
+      if (!a || typeof a.name !== 'string' || typeof a.text !== 'string') {
+        throw new HttpError(400, 'invalid_attachments', 'Each attachment needs a "name" and "text".');
+      }
+      total += a.text.length;
+      return { name: a.name.replace(/[\r\n<>]/g, ' ').slice(0, 100), text: a.text };
+    });
+    if (total > MAX_ATTACHMENT_CHARS) {
+      throw new HttpError(413, 'attachments_too_large', `Attached files can be up to ${MAX_ATTACHMENT_CHARS.toLocaleString('en-US')} characters in total.`);
+    }
+  }
+  return { question, topK, sourcesOnly, useMemory, model, style, attachments };
 }
 
 export function search(index, queryTerms, topK) {
@@ -150,7 +172,9 @@ function answerWith(index, question, topK, repoUrl) {
     throw new HttpError(400, 'no_searchable_terms', 'Question has no searchable words. Ask about a specific topic.');
   }
   // Bare numbers ("1 1") would match stray digits in the docs; never treat that as grounded.
-  const hits = terms.every((t) => /^\d+$/.test(t)) ? [] : search(index, terms, topK);
+  // Only numbers and math words ("2 times 3 plus 4") say nothing about a topic: leave it to the calculator/model.
+  const topical = terms.filter((t) => !WEAK_TERMS.has(t));
+  const hits = topical.every((t) => /^\d+$/.test(t)) ? [] : search(index, terms, topK);
   const best = hits[0];
   if (!best || best.score < MIN_SCORE || best.coverage < MIN_COVERAGE || best.weighted < MIN_WEIGHTED_COVERAGE) {
     return {

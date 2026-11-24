@@ -14,7 +14,7 @@
     for (const k of kids) if (k != null) n.append(k);
     return n;
   };
-  const LS = { collapsed: 'ova.chat.collapsed', closedFolders: 'ova.chat.closedFolders', model: 'ova.chat.model', memory: 'ova.chat.memory' };
+  const LS = { sideOpen: 'ova.chat.sideOpen', closedFolders: 'ova.chat.closedFolders', model: 'ova.chat.model', memory: 'ova.chat.memory' };
   const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } };
 
@@ -25,7 +25,8 @@
   };
   const prettyModel = (m) => MODEL_NAMES[m] || m || '';
 
-  const state = { folders: [], chats: [], activeId: null, pendingFolder: null, busy: false, closed: new Set(lsGet(LS.closedFolders, [])) };
+  const state = { folders: [], chats: [], activeId: null, pendingFolder: null, busy: false, closed: new Set(lsGet(LS.closedFolders, [])), query: '', files: [], think: false };
+  const MAX_FILE_CHARS = 15000, MAX_TOTAL_CHARS = 40000, MAX_FILES = 5, MAX_PDF_PAGES = 40;
 
   // ---------- API ----------
   async function api(path, { method = 'GET', body } = {}) {
@@ -72,6 +73,12 @@
   function renderSidebar() {
     const list = $('#side-list');
     list.replaceChildren();
+    if (state.query) {
+      const q = state.query.toLowerCase();
+      const hits = state.chats.filter((c) => c.title.toLowerCase().includes(q));
+      list.append(section(`Results for "${state.query}"`, hits.length ? hits.map(chatItem) : [el('div', { class: 'empty-note', text: 'No chats match.' })]));
+      return;
+    }
     const pinned = state.chats.filter((c) => c.pinned);
     if (pinned.length) list.append(section('Pinned', pinned.map(chatItem)));
 
@@ -187,7 +194,11 @@
       try { window.renderMathInElement(container, { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '\\[', right: '\\]', display: true }, { left: '\\(', right: '\\)', display: false }], throwOnError: false }); } catch { /* ignore */ }
     }
   }
-  function userMsg(text) { return el('div', { class: 'msg user' }, el('div', { class: 'bubble', text })); }
+  function userMsg(text, files = []) {
+    return el('div', { class: 'msg user' },
+      files.length ? el('div', { class: 'att' }, ...files.map((n) => el('span', { class: 'chip' }, el('span', { text: '📄' }), el('span', { class: 'n', text: n })))) : null,
+      el('div', { class: 'bubble', text }));
+  }
   function aiMsg(text, meta) {
     meta = meta || {};
     const content = el('div', { class: 'content' });
@@ -253,7 +264,7 @@
       const d = await api(`/v1/chats/${id}`);
       if (state.activeId !== id) return;
       $('#chat-title').textContent = d.chat.title;
-      thread.replaceChildren(...d.messages.map((m) => (m.role === 'user' ? userMsg(m.content) : aiMsg(m.content, m.meta))));
+      thread.replaceChildren(...d.messages.map((m) => (m.role === 'user' ? userMsg(m.content, (m.meta && m.meta.attachments) || []) : aiMsg(m.content, m.meta))));
       if (!d.messages.length) setEmpty(true);
       scrollDown();
     } catch (err) { thread.replaceChildren(el('div', { class: 'msg ai' }, el('div', { class: 'err-text', text: err.message }))); }
@@ -262,7 +273,9 @@
     if (state.busy || !text.trim()) return;
     state.busy = true; $('#send').disabled = true;
     setEmpty(false);
-    thread.append(userMsg(text));
+    const files = state.files.filter((f) => !f.loading);
+    thread.append(userMsg(text, files.map((f) => f.name)));
+    clearFiles();
     const typing = el('div', { class: 'msg ai' }, el('div', { class: 'typing', 'aria-label': 'Thinking' }, el('i'), el('i'), el('i')));
     thread.append(typing); scrollDown();
     try {
@@ -270,8 +283,9 @@
         const c = await api('/v1/chats', { method: 'POST', body: state.pendingFolder ? { folder_id: state.pendingFolder } : {} });
         state.activeId = c.id; state.pendingFolder = null;
       }
-      const model = $('#model').value;
-      const body = { question: text.slice(0, 500), chat_id: state.activeId, use_memory: $('#use-memory').checked, ...(model !== 'auto' ? { model } : {}) };
+      const model = state.think ? 'plus' : $('#model').value;
+      const body = { question: text.slice(0, 500), chat_id: state.activeId, use_memory: $('#use-memory').checked, ...(model !== 'auto' ? { model } : {}),
+        ...(files.length ? { attachments: files.map((f) => ({ name: f.name, text: f.text })) } : {}) };
       const r = await api('/v1/ask', { method: 'POST', body });
       typing.replaceWith(aiMsg(r.answer || r.message || 'No answer.', r));
       await loadList();
@@ -292,8 +306,10 @@
   });
   $('#composer').addEventListener('submit', (e) => {
     e.preventDefault();
-    const text = input.value.trim();
+    let text = input.value.trim();
+    if (!text && state.files.length) text = 'Summarize the attached file' + (state.files.length > 1 ? 's.' : '.');
     if (!text) return;
+    if (state.files.some((f) => f.loading)) { alert('Still reading your file. Try again in a moment.'); return; }
     if (text.length > 500) { alert('Questions can be up to 500 characters.'); return; }
     input.value = ''; autosize();
     send(text);
@@ -304,20 +320,113 @@
   $('#use-memory').addEventListener('change', () => lsSet(LS.memory, $('#use-memory').checked));
   $('#new-chat').addEventListener('click', () => newChat());
 
-  // ---------- sidebar open/close ----------
+  // ---------- panel open/close (rail on desktop, slide-over on phones) ----------
   const app = $('#app');
   const mobile = () => matchMedia('(max-width: 820px)').matches;
-  function closeSide() { if (mobile()) { app.classList.remove('side-open'); $('#scrim').hidden = true; } }
-  $('#collapse').addEventListener('click', () => {
-    if (mobile()) return closeSide();
-    app.classList.add('collapsed'); lsSet(LS.collapsed, true);
+  function openSide(focusSearch = false) {
+    app.classList.add('side-open');
+    if (mobile()) $('#scrim').hidden = false; else lsSet(LS.sideOpen, true);
+    if (focusSearch) setTimeout(() => $('#search').focus(), 50);
+  }
+  function closeSide(force = false) {
+    if (!mobile() && !force) return;
+    app.classList.remove('side-open'); $('#scrim').hidden = true;
+    if (!mobile()) lsSet(LS.sideOpen, false);
+  }
+  $('#collapse').addEventListener('click', () => closeSide(true));
+  $('#open-side').addEventListener('click', () => openSide());
+  $('#scrim').addEventListener('click', () => closeSide(true));
+  $('#rail-new').addEventListener('click', () => newChat());
+  $('#rail-search').addEventListener('click', () => openSide(true));
+  $('#rail-chats').addEventListener('click', () => (app.classList.contains('side-open') ? closeSide(true) : openSide()));
+  $('#rail-folders').addEventListener('click', () => { openSide(); const h = [...document.querySelectorAll('.sec-head span')].find((x) => x.textContent === 'Folders'); if (h) h.scrollIntoView({ block: 'start' }); });
+  $('#search').addEventListener('input', () => { state.query = $('#search').value.trim(); renderSidebar(); });
+  if (lsGet(LS.sideOpen, false) && !mobile()) app.classList.add('side-open');
+
+  // ---------- + menu: files and memory ----------
+  $('#plus').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const mem = $('#use-memory').checked;
+    openMenu(e.currentTarget, [
+      mItem('📎  Add photos & files…', () => $('#file').click()),
+      el('hr'),
+      mItem(`${mem ? '✓' : '  '}  Use past chats as memory`, () => { $('#use-memory').checked = !mem; lsSet(LS.memory, !mem); }),
+    ]);
   });
-  $('#open-side').addEventListener('click', () => {
-    if (mobile()) { app.classList.add('side-open'); $('#scrim').hidden = false; return; }
-    app.classList.remove('collapsed'); lsSet(LS.collapsed, false);
+  $('#file').addEventListener('change', () => { addFiles([...$('#file').files]); $('#file').value = ''; });
+  // drag & drop files onto the composer
+  $('#pill').addEventListener('dragover', (e) => { e.preventDefault(); });
+  $('#pill').addEventListener('drop', (e) => { e.preventDefault(); addFiles([...e.dataTransfer.files]); });
+
+  const fmt = (n) => (n < 1000 ? `${n} chars` : `${Math.round(n / 1000)}k chars`);
+  function renderChips() {
+    const box = $('#chips');
+    box.hidden = !state.files.length;
+    box.replaceChildren(...state.files.map((f) => el('span', { class: 'chip' + (f.loading ? ' loading' : ''), title: f.note || f.name },
+      el('span', { text: f.name.toLowerCase().endsWith('.pdf') ? '📕' : '📄' }), el('span', { class: 'n', text: f.name }),
+      el('span', { class: 's', text: f.loading ? 'reading…' : fmt(f.text.length) + (f.note ? ' · cut' : '') }),
+      el('button', { type: 'button', 'aria-label': `Remove ${f.name}`, onclick: () => { state.files = state.files.filter((x) => x !== f); renderChips(); } }, el('span', { text: '×' })))));
+  }
+  function clearFiles() { state.files = []; renderChips(); }
+  let pdfjs = null;
+  async function pdfText(file) {
+    if (!pdfjs) {
+      pdfjs = await import('../vendor/pdfjs/pdf.min.mjs');
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdfjs/pdf.worker.min.mjs', location.href).href;
+    }
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const pages = [];
+    for (let i = 1; i <= Math.min(doc.numPages, MAX_PDF_PAGES); i++) {
+      const page = await doc.getPage(i);
+      const tc = await page.getTextContent();
+      pages.push(`[Page ${i}]\n` + tc.items.map((it) => it.str + (it.hasEOL ? '\n' : ' ')).join('').trim());
+    }
+    if (doc.numPages > MAX_PDF_PAGES) pages.push(`[Only the first ${MAX_PDF_PAGES} of ${doc.numPages} pages were read.]`);
+    return pages.join('\n\n');
+  }
+  async function addFiles(list) {
+    for (const file of list) {
+      if (state.files.length >= MAX_FILES) { alert(`You can attach up to ${MAX_FILES} files.`); break; }
+      if (/^image\//.test(file.type)) { alert(`${file.name}: images aren't supported yet. Text, code and PDF files work.`); continue; }
+      if (file.size > 15 * 1024 * 1024) { alert(`${file.name} is larger than 15 MB.`); continue; }
+      const entry = { name: file.name, text: '', loading: true };
+      state.files.push(entry); renderChips();
+      try {
+        let text = /\.pdf$/i.test(file.name) || file.type === 'application/pdf' ? await pdfText(file) : await file.text();
+        if (!text.trim()) throw new Error(/\.pdf$/i.test(file.name) ? 'no readable text (a scanned PDF?)' : 'the file is empty');
+        if (/\u0000/.test(text.slice(0, 2000))) throw new Error("this doesn't look like a text file");
+        if (text.length > MAX_FILE_CHARS) { entry.note = `Only the first ${MAX_FILE_CHARS.toLocaleString()} characters are sent.`; text = text.slice(0, MAX_FILE_CHARS); }
+        const used = state.files.reduce((n, f) => n + (f === entry ? 0 : f.text.length), 0);
+        if (used + text.length > MAX_TOTAL_CHARS) { text = text.slice(0, Math.max(0, MAX_TOTAL_CHARS - used)); entry.note = 'Cut to fit the size limit for all files together.'; }
+        entry.text = text; entry.loading = false;
+      } catch (err) {
+        state.files = state.files.filter((x) => x !== entry);
+        alert(`Couldn't read ${file.name}: ${err.message}`);
+      }
+      renderChips();
+    }
+  }
+
+  // ---------- Think, mic, suggestions ----------
+  $('#think').addEventListener('click', () => {
+    state.think = !state.think;
+    $('#think').setAttribute('aria-pressed', String(state.think));
   });
-  $('#scrim').addEventListener('click', closeSide);
-  if (lsGet(LS.collapsed, false) && !mobile()) app.classList.add('collapsed');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR) {
+    const mic = $('#mic'); mic.hidden = false;
+    let rec = null;
+    mic.addEventListener('click', () => {
+      if (rec) { rec.stop(); return; }
+      rec = new SR(); rec.lang = navigator.language || 'en-US'; rec.interimResults = true; rec.continuous = false;
+      const base = input.value ? input.value.replace(/\s*$/, ' ') : '';
+      rec.onresult = (e) => { input.value = base + [...e.results].map((r) => r[0].transcript).join(''); autosize(); };
+      rec.onend = () => { rec = null; mic.classList.remove('rec'); input.focus(); };
+      rec.onerror = () => { rec = null; mic.classList.remove('rec'); };
+      mic.classList.add('rec'); rec.start();
+    });
+  }
+  document.querySelectorAll('#suggest button').forEach((b) => b.addEventListener('click', () => { input.value = b.dataset.prompt; autosize(); input.focus(); }));
 
   // ---------- start once unlocked ----------
   setEmpty(true);

@@ -22,7 +22,7 @@ function notAnswered(question, extra = {}) {
 
 // reserveGeneral(): Promise<{ ok: true } | { ok: false, reason: string }> – consumes general quota.
 // loadMemory(): Promise<{ profile, chunks }> – owner keys only; null for everyone else.
-export async function resolveAsk({ index, question, topK, sourcesOnly, env, reserveGeneral, loadMemory = null, where = null, model = 'auto', style = 'simple', history = [], log = console }) {
+export async function resolveAsk({ index, question, topK, sourcesOnly, env, reserveGeneral, loadMemory = null, where = null, model = 'auto', style = 'simple', history = [], attachments = [], log = console }) {
   const math = tryMath(question);
   if (math) {
     if (math.error) {
@@ -43,7 +43,9 @@ export async function resolveAsk({ index, question, topK, sourcesOnly, env, rese
   const hasTerms = tokenize(question).length > 0;
   // Weather and market-price questions need live data, not the docs.
   const live = !sourcesOnly && aiConfigured(env) && env.TOOLS_ENABLED !== 'false' && liveIntent(question);
-  const docs = hasTerms && !live ? docsAnswer(index, question, topK, env.REPO_URL) : notAnswered(question);
+  // A question about an attached file is answered from the file, not the docs.
+  const hasFiles = attachments.length > 0 && !sourcesOnly && aiConfigured(env);
+  const docs = hasTerms && !live && !hasFiles ? docsAnswer(index, question, topK, env.REPO_URL) : notAnswered(question);
   if (docs.answered) {
     // Docs answers are exact sentences; rewrite them for a 9th grader unless style is "original".
     if (style !== 'simple' || !aiConfigured(env)) return { ...docs, style: 'original' };
@@ -54,7 +56,7 @@ export async function resolveAsk({ index, question, topK, sourcesOnly, env, rese
     return { ...docs, answer: s.text, original_answer: docs.answer, style: 'simple', simplified_by: s.model };
   }
 
-  const generalAllowed = !sourcesOnly && aiConfigured(env) && !isProjectQuestion(question);
+  const generalAllowed = !sourcesOnly && aiConfigured(env) && (hasFiles || !isProjectQuestion(question));
   if (!generalAllowed) {
     if (!hasTerms) {
       throw new HttpError(400, 'no_searchable_terms', 'Question has no searchable words. Ask about a specific topic.');
@@ -69,7 +71,7 @@ export async function resolveAsk({ index, question, topK, sourcesOnly, env, rese
   const memory = loadMemory ? await loadMemory() : null;
   try {
     const extra = style === 'original' ? { styleOverride: 'Write in your normal style.' } : {};
-    return { ...(await generalAnswer(env, question, memory, { where, model, history, ...extra })), style, nearest_topics: docs.nearest_topics };
+    return { ...(await generalAnswer(env, question, memory, { where, model, history, attachments, ...extra })), style, nearest_topics: docs.nearest_topics };
   } catch (err) {
     log.error('general answer failed', err && err.message);
     if (err && err.code === 'ai_daily_limit') {

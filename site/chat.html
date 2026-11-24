@@ -4,68 +4,108 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Open Verse Ai Chat</title>
-<meta name="description" content="Chat with Open Verse Ai: saved chats, folders, pins, model choice and memory.">
+<meta name="description" content="Chat with Open Verse Ai: saved chats, folders, pins, file uploads, model choice and memory.">
 <script>document.documentElement.classList.add('ova-locked')</script>
-<link rel="stylesheet" href="assets/chat.css">
-<link rel="stylesheet" href="assets/lock.css">
+<link rel="stylesheet" href="assets/chat.css?v=2">
+<link rel="stylesheet" href="assets/lock.css?v=2">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
 <script src="assets/config.js"></script>
 </head>
 <body>
 <div class="app" id="app">
+  <!-- Thin icon rail (always visible on desktop) -->
+  <nav class="rail" aria-label="Main">
+    <a class="rail-logo" href="index.html" title="Open Verse Ai home"><span class="mark">OV</span></a>
+    <button class="rail-btn" id="rail-new" title="New chat" aria-label="New chat">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    </button>
+    <button class="rail-btn" id="rail-search" title="Search chats" aria-label="Search chats">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    </button>
+    <button class="rail-btn" id="rail-chats" title="Chats" aria-label="Show chats">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12Z"/></svg>
+    </button>
+    <button class="rail-btn" id="rail-folders" title="Folders" aria-label="Show folders">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h4v16H4zM10 4h4v16h-4zM16.5 4.5l3.8 1-3.6 14.6-3.8-1z"/></svg>
+    </button>
+    <div class="rail-spacer"></div>
+    <a class="rail-btn" href="portal.html" title="API keys" aria-label="API keys">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 9.2-9.2M17 6l3 3M15 8l2 2"/></svg>
+    </a>
+    <div class="avatar" title="Mohammad">M</div>
+  </nav>
+
+  <!-- Chat list panel (opens from the rail) -->
   <aside class="sidebar" id="sidebar" aria-label="Chats">
     <div class="side-top">
-      <a class="brand" href="index.html"><span class="mark">OV</span><span>Open Verse Ai</span></a>
-      <button class="icon-btn" id="collapse" title="Hide sidebar" aria-label="Hide sidebar">
+      <span class="side-title">Chats</span>
+      <button class="icon-btn" id="collapse" title="Close panel" aria-label="Close panel">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
       </button>
     </div>
+    <div class="side-search"><input id="search" type="search" placeholder="Search chats" aria-label="Search chats"></div>
     <button class="new-chat" id="new-chat">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       New chat
     </button>
     <nav class="side-scroll" id="side-list" aria-live="polite"></nav>
-    <div class="side-foot">
-      <a href="portal.html">API keys</a> · <a href="docs.html">Docs</a>
-    </div>
+    <div class="side-foot"><a href="portal.html">API keys</a> · <a href="docs.html">Docs</a></div>
   </aside>
   <div class="scrim" id="scrim" hidden></div>
 
-  <main class="main">
+  <main class="main empty">
     <header class="nav topbar"><div class="wrap">
-      <button class="icon-btn" id="open-side" title="Show sidebar" aria-label="Show sidebar">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <button class="icon-btn" id="open-side" title="Chats" aria-label="Show chats">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
+      <label class="model-pick" title="Model">
+        <select id="model" aria-label="Model">
+          <option value="auto">Open Verse Ai</option>
+          <option value="plus">Open Source+ (Qwen + Llama + Gemma)</option>
+          <option value="qwen">Qwen 3.8 27B</option>
+          <option value="gemma">Gemma 4 26B</option>
+          <option value="llama4">Llama 4 Scout</option>
+          <option value="llama">Llama 3.3 70B</option>
+          <option value="mistral">Mistral Small 3.1</option>
+        </select>
+      </label>
       <div class="chat-title" id="chat-title"></div>
     </div></header>
 
     <section class="thread" id="thread" aria-live="polite"></section>
 
-    <section class="hello" id="hello">
-      <h1>What's up, Mohammad?</h1>
-    </section>
+    <section class="hello" id="hello"><h1>What's up, Mohammad?</h1></section>
 
     <form class="composer" id="composer" autocomplete="off">
-      <div class="box">
-        <textarea id="input" rows="1" placeholder="Ask anything… (Enter to send, Shift+Enter for a new line)" aria-label="Message"></textarea>
-        <div class="row">
-          <select id="model" aria-label="Model">
-            <option value="auto">Auto (best available)</option>
-            <option value="plus">Open Source+ (Qwen + Llama + Gemma)</option>
-            <option value="qwen">Qwen 3.8 27B</option>
-            <option value="gemma">Gemma 4 26B</option>
-            <option value="llama4">Llama 4 Scout</option>
-            <option value="llama">Llama 3.3 70B</option>
-            <option value="mistral">Mistral Small 3.1</option>
-          </select>
-          <label class="toggle" title="Use your past chats, facts and Google data as memory">
-            <input type="checkbox" id="use-memory" checked> <span>Use past chats as memory</span>
-          </label>
+      <div class="pill" id="pill">
+        <div class="chips" id="chips" hidden></div>
+        <div class="pill-row">
+          <button type="button" class="pill-btn" id="plus" title="Add files and more" aria-label="Add files and more" aria-haspopup="menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <textarea id="input" rows="1" placeholder="Ask Open Verse Ai" aria-label="Message"></textarea>
+          <button type="button" class="pill-btn think" id="think" aria-pressed="false" title="Think: Qwen + Llama + Gemma work together (slower)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4a3 3 0 0 0-3 3v.2A3 3 0 0 0 4 10v1a3 3 0 0 0 1.4 2.5A3 3 0 0 0 8 18h1V4Z"/><path d="M15 4a3 3 0 0 1 3 3v.2A3 3 0 0 1 20 10v1a3 3 0 0 1-1.4 2.5A3 3 0 0 1 16 18h-1V4Z"/></svg>
+            <span>Think</span>
+          </button>
+          <button type="button" class="pill-btn" id="mic" title="Dictate" aria-label="Dictate" hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          </button>
           <button type="submit" class="send" id="send" aria-label="Send">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
           </button>
         </div>
+      </div>
+      <input type="checkbox" id="use-memory" checked hidden>
+      <input type="file" id="file" multiple hidden accept=".txt,.md,.csv,.tsv,.json,.xml,.html,.htm,.css,.js,.mjs,.ts,.py,.java,.c,.cpp,.h,.ino,.m,.r,.sql,.yaml,.yml,.ini,.log,.tex,.pdf,text/*,application/pdf">
+      <div class="suggest" id="suggest">
+        <button type="button" data-prompt="Teach me something new about ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>Learn something</button>
+        <button type="button" data-prompt="Solve this step by step: ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h2M14 12h2M8 16h2M14 16h2"/></svg>Solve a math problem</button>
+        <button type="button" data-prompt="Help me write or edit this: ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Write or edit</button>
       </div>
       <div class="fine">AI answers can be wrong. Numbers are computed exactly; check the setup.</div>
     </form>
@@ -80,7 +120,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"></script>
-<script src="assets/chat.js"></script>
-<script src="assets/lock.js"></script>
+<script src="assets/chat.js?v=2"></script>
+<script src="assets/lock.js?v=2"></script>
 </body>
 </html>

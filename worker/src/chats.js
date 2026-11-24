@@ -114,7 +114,7 @@ export async function chatHistory(db, chatId) {
   return { chat: c, history: rows.reverse().map((m) => ({ role: m.role, content: m.content.slice(0, 1500) })) };
 }
 
-export async function saveExchange(db, chat, question, result, isFirst) {
+export async function saveExchange(db, chat, question, result, isFirst, attachmentNames = []) {
   const t = now();
   const meta = {
     mode: result.mode, model: result.model, style: result.style, confidence: result.confidence,
@@ -124,7 +124,8 @@ export async function saveExchange(db, chat, question, result, isFirst) {
     contributors: result.contributors, candidates: result.candidates, combined_by: result.combined_by,
   };
   await db.batch([
-    db.prepare('INSERT INTO chat_messages (chat_id, role, content, meta, created_at) VALUES (?, ?, ?, NULL, ?)').bind(chat.id, 'user', question, t),
+    db.prepare('INSERT INTO chat_messages (chat_id, role, content, meta, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(chat.id, 'user', question, attachmentNames.length ? JSON.stringify({ attachments: attachmentNames }) : null, t),
     db.prepare('INSERT INTO chat_messages (chat_id, role, content, meta, created_at) VALUES (?, ?, ?, ?, ?)')
       .bind(chat.id, 'assistant', String(result.answer || result.message || ''), JSON.stringify(meta), t),
     db.prepare('UPDATE chats SET updated_at = ?, title = ? WHERE id = ?')

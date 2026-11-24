@@ -100,7 +100,7 @@ async function route(request, env, ctx) {
     if (method !== 'POST') throw new HttpError(405, 'method_not_allowed', 'Use POST.');
     const row = await authenticate(request, env.DB);
     const body = await readJson(request); // validate before spending quota
-    const { question, topK, sourcesOnly, useMemory, model, style } = validateQuestion(body);
+    const { question, topK, sourcesOnly, useMemory, model, style, attachments } = validateQuestion(body);
     // Optional saved chat (owner only): its recent messages give the model context, and the
     // exchange is saved back to it.
     let chat = null;
@@ -114,7 +114,7 @@ async function route(request, env, ctx) {
     ctx.waitUntil(touchKey(env.DB, row.id));
     const learning = row.scope === 'owner' && useMemory && env.MEMORY_LEARN !== 'false';
     const finish = async (result) => {
-      if (chat) { await saveExchange(env.DB, chat, question, result, history.length === 0); result.chat_id = chat.id; }
+      if (chat) { await saveExchange(env.DB, chat, question, result, history.length === 0, attachments.map((a) => a.name)); result.chat_id = chat.id; }
       return json(result, 200, rl);
     };
     if (learning) {
@@ -130,6 +130,7 @@ async function route(request, env, ctx) {
       reserveGeneral: () => reserveGeneral(env.DB, row.key_hash, env),
       model,
       style,
+      attachments,
       // Personal memory is only ever read for owner keys.
       loadMemory: row.scope === 'owner' && useMemory
         ? async () => {

@@ -22,6 +22,9 @@ Open Source+ is a combined model mode, chosen by sending model set to plus. Qwen
 ## Saved chats
 The chat page saves conversations for owner keys. Chats can be pinned, renamed, moved into folders such as Math, and deleted. When a question is sent with a chat_id, the chat's recent messages are given to the model so follow-up questions work, and, when memory is on, recent work from other chats in the same folder is used as background.
 
+## Attached files
+POST /v1/ask accepts attachments, a list of up to 5 files given as a name and their text, at most 40,000 characters in total. A question with attached files is answered from the files by an AI model rather than from these docs. The files are treated as data from the user, and instructions written inside them are ignored. File text is not saved to memory. The chat page reads text, code and PDF files in the browser; images are not supported yet.
+
 ## Reading level
 By default every answer is written for a 9th-grade reader: everyday words, short sentences and short explanations of technical terms, while keeping every fact, number, unit, formula and step. Answers from the docs are rewritten by a model and checked so that every number in the original still appears; if any number is missing, the original wording is returned instead and simplify_skipped says why. The original wording is always included as original_answer. Send style set to original to get the unchanged wording.
 

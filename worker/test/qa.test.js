@@ -77,6 +77,8 @@ const ROUTING = {
   'How do I revoke a key?': 'Revoking a key',
   'How do I add knowledge?': 'Adding knowledge',
   'What is the square root of -4 in real numbers?': null,
+  'What is 2 times 3 then times 4 then times 5?': null,
+  'What is 12 plus 7 divided by 3?': null,
   'How is volatility annualized?': 'Volatility',
   'Which models does Open Verse Ai use?': 'Models',
 };
