@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Open Verse Ai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ask your Open Verse Ai about the page you're on: summarize, explain simply, or make a study guide.",
   "action": {
     "default_title": "Ask Open Verse Ai about this page",

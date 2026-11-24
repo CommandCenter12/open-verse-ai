@@ -51,7 +51,8 @@
     show('main');
     const tab = await activeTab();
     $('#page-title').textContent = tab ? (tab.title || tab.url || 'This page') : 'No page';
-    if (tab && !canRead(tab.url)) { $('#page').classList.add('blocked'); $('#page-title').textContent = "Chrome doesn't let extensions read this page"; $('#use-page').checked = false; }
+    const why = tab && blockedReason(tab.url);
+    if (why) { $('#page').classList.add('blocked'); $('#page-title').textContent = why; $('#use-page').checked = false; }
   }
 
   // ---------- setup / unlock / lock ----------
@@ -102,11 +103,33 @@
 
   // ---------- reading the page ----------
   async function activeTab() { const [t] = await chrome.tabs.query({ active: true, currentWindow: true }); return t || null; }
-  function canRead(url) { return /^(https?|file):/i.test(url || '') && !/^https:\/\/(chrome\.google\.com\/webstore|chromewebstore\.google\.com)/i.test(url); }
+  // Pages Chrome never lets extensions read. An unknown URL is NOT treated as blocked: we just try.
+  function blockedReason(url) {
+    if (!url) return null;
+    if (/^(chrome|edge|about|devtools|view-source):/i.test(url)) return "Chrome's own pages (settings, extensions, new tab) can't be read by any extension.";
+    if (/^chrome-extension:/i.test(url)) return url.includes('mhjfbmdgcfjbbpaeojofohoefgiehjai')
+      ? "PDFs in Chrome's viewer can't be read by extensions. Download the PDF and add it with + in the chat page."
+      : "Other extensions' pages can't be read.";
+    if (/^https:\/\/(chrome\.google\.com\/webstore|chromewebstore\.google\.com)/i.test(url)) return 'Chrome blocks extensions on the Web Store.';
+    return null;
+  }
+  // Turns Chrome's error into a reason you can act on.
+  function explain(err, url) {
+    const m = String((err && err.message) || err);
+    if (/^file:/i.test(url || '') || /file:\/\//i.test(m)) return 'To read files on your Mac: chrome://extensions → Open Verse Ai → Details → turn on "Allow access to file URLs".';
+    if (/\.pdf($|\?)/i.test(url || '')) return "Chrome's PDF viewer can't be read by extensions. Download the PDF and add it with + in the chat page.";
+    if (/Cannot access|cannot be scripted|extensions gallery|chrome:\/\//i.test(m)) return "Chrome doesn't allow extensions on this page.";
+    if (/activeTab|permission/i.test(m)) return 'Click the Open Verse Ai icon (or press ⌘⇧O) on the page first, then ask.';
+    return m;
+  }
   async function readPage() {
     const tab = await activeTab();
-    if (!tab || !canRead(tab.url)) throw new Error("Chrome doesn't let extensions read this page.");
-    const [res] = await chrome.scripting.executeScript({
+    if (!tab) throw new Error('No open tab to read.');
+    const why = blockedReason(tab.url);
+    if (why) throw new Error(why);
+    let res;
+    try {
+      [res] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       // Runs in the page: highlighted text if any, else the visible text of the page.
       func: () => {
@@ -114,9 +137,14 @@
         const text = sel || (document.body ? document.body.innerText : '');
         return { title: document.title, url: location.href, selection: Boolean(sel), text };
       },
-    });
+      });
+    } catch (err) { throw new Error(explain(err, tab.url)); }
     const p = res && res.result;
-    if (!p || !p.text || !p.text.trim()) throw new Error('This page has no readable text.');
+    if (!p || !p.text || !p.text.trim()) {
+      throw new Error(/docs\.google\.com\/(document|presentation)/i.test(tab.url || '')
+        ? 'Google Docs draws its text in a way extensions can\'t read. Use File → Download → PDF or .txt, then add it with + in the chat page.'
+        : 'This page has no readable text.');
+    }
     const clean = p.text.replace(/\n{3,}/g, '\n\n').trim();
     return { ...p, text: clean.slice(0, MAX_PAGE_CHARS), cut: clean.length > MAX_PAGE_CHARS };
   }
@@ -156,7 +184,7 @@
       if ($('#use-page').checked) {
         status('Reading the page…');
         page = await readPage();
-        body.attachments = [{ name: `${page.selection ? 'Highlighted text from' : 'Web page'}: ${page.title || page.url}`.slice(0, 100), text: `URL: ${page.url}\n\n${page.text}` }];
+        body.attachments = [{ name: `${page.selection ? 'Highlighted text from' : 'Web page'}: ${page.title || page.url || 'this page'}`.slice(0, 100), text: `${page.url ? `URL: ${page.url}\n\n` : ''}${page.text}` }];
       }
       if ($('#save-chat').checked) {
         const c = await api('/v1/chats', {});
