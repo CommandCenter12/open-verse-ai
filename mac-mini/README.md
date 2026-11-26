@@ -45,6 +45,7 @@ The script asks before every change. It asks for your password only when macOS n
 
   Ollama only listens on the Mac itself (127.0.0.1:11434), not the internet.
 - **Command Center heartbeat** (optional): set up only if `~/trading-bot` is on the Mac.
+- **Trading bot** (optional): if `~/trading-bot` is on the Mac, runs its own `setup-mac-mini.sh --bot-only` (Python environment, phone approvals, the 5-minute paper-trader job and its self-tests). Copy that folder from your MacBook; it holds private keys, so it is never in GitHub.
 
 ## Test it
 

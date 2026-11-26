@@ -11,6 +11,7 @@
 #   3. Checks FileVault + automatic login (these two must be changed in System Settings)
 #   4. Installs Ollama (Homebrew), starts it at every login, downloads models that fit your RAM
 #   5. Optional: installs the Command Center heartbeat if ~/trading-bot is on this Mac
+#   6. Optional: sets up the trading bot itself if ~/trading-bot is on this Mac (its own setup-mac-mini.sh --bot-only)
 # It never stores or asks for your account password itself, and never opens Ollama to the internet.
 set -uo pipefail
 
@@ -136,6 +137,18 @@ if [ -f "$HOME/trading-bot/scripts/launchd/$PL.plist" ] && [ -f "$HOME/trading-b
   else warn "Heartbeat not installed"; fi
 else
   echo "  (skipped: copy ~/trading-bot to this Mac first if you want Command Center to show it as Online)"
+fi
+
+# ---------- 6. trading bot (optional) ----------
+step "6. Trading bot (paper trading, phone approvals)"
+TB="$HOME/trading-bot/setup-mac-mini.sh"
+if [ -f "$TB" ]; then
+  if launchctl print "gui/$(id -u)/com.openverse.trader" >/dev/null 2>&1; then ok "Trader job is running (every 5 minutes)"
+  elif ask "Set up the trading bot (Python env, phone alerts, 5-minute trader job, self-tests)?"; then
+    bash "$TB" --bot-only && ok "Trading bot set up" || warn "Trading bot setup reported a problem (see above)"
+  else warn "Trading bot not set up"; fi
+else
+  echo "  (skipped: ~/trading-bot isn't on this Mac. Copy it from your MacBook; it holds private keys, so it's never in GitHub)"
 fi
 
 # ---------- summary ----------
